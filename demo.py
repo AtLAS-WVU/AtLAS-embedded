@@ -2,6 +2,10 @@
 import random
 import threading
 import time
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 # The (threading.Thread) is the super class of the Demo class.
@@ -26,7 +30,7 @@ class Demo(threading.Thread):
             # Gotta acquire a lock because the number variable is accesed by multiple threads.
             self.lock.acquire()
             self.number = random.randint(0, 100)
-            print("Changed number to {}.".format(self.number))
+            logger.debug("Changed number to %d.", self.number)
             # Always remember to release the lock ASAP
             self.lock.release()
             # Release the lock BEFORE sleeping, or else it'll hold onto the lock for the entire 5 seconds
