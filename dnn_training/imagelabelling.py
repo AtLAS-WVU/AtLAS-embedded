@@ -7,6 +7,7 @@ To run this file, simply do
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
+from cv2 import cv2
 
 # This is necessary because pims uses Matplotlib, and Matplotlib interferes with tk and causes a crash
 # if I don't do this.
@@ -23,6 +24,8 @@ imageio.plugins.ffmpeg.download()
 IMAGE_RESOLUTION = [1080//2, 1920//2]
 
 MASK_OPACITY = 255
+
+OPTICAL_FLOW_SCALE = 4
 
 
 class Gui:
@@ -61,6 +64,15 @@ class Gui:
         self.copy_mask_var = tk.IntVar()
         tk.Checkbutton(master=self.frame, text="Copy mask to next frame",
                        variable=self.copy_mask_var).grid(row=3, column=0, sticky=tk.W)
+
+        self.optical_flow_var = tk.IntVar()
+        tk.Checkbutton(master=self.frame, text="Motion Estimation",
+                       variable=self.optical_flow_var).grid(row=3, column=1, sticky=tk.W)
+
+        tk.Label(master=self.frame, text="Motion estimation adjustment").grid(row=4, column=0, sticky=tk.E)
+        self.flow_scale_slider = tk.Scale(self.frame, from_=0.5, to=10.0, resolution=0.05, orient=tk.HORIZONTAL)
+        self.flow_scale_slider.grid(row=4, column=1, columnspan=2, sticky=tk.EW)
+        self.flow_scale_slider.set(OPTICAL_FLOW_SCALE)
 
         # String containing the file name of the current video
         self.video_file = None
@@ -158,6 +170,17 @@ class Gui:
             if self.copy_mask_var.get() == 1 and np.all(self.image_mask[self.current_frame, :, :, 3] == 0):
                 self.image_mask[self.current_frame, :, :, 3] = self.image_mask[self.current_frame - 1, :, :, 3]
                 self.mask_modified = True
+                if self.optical_flow_var.get() == 1:
+                    flow = cv2.calcOpticalFlowFarneback(
+                        cv2.cvtColor(self.image_seq[self.current_frame - 1], cv2.COLOR_RGB2GRAY),
+                        cv2.cvtColor(self.image_seq[self.current_frame], cv2.COLOR_RGB2GRAY),
+                        None, 0.5, 3, 15, 3, 5, 1.2, 0
+                    )
+                    flow = np.mean(flow, axis=(0, 1)) * self.flow_scale_slider.get()
+                    dx = round(flow[1])
+                    dy = round(flow[0])
+                    self.image_mask[self.current_frame, :, :, :] = np.roll(self.image_mask[self.current_frame, :, :, :],
+                                                                           (int(dx), int(dy)), axis=(0, 1))
 
             self.display_mask()
 
