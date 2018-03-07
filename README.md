@@ -23,3 +23,7 @@ Embedded software for AuTonomous Low-Altitude Service drone
    - `pip install matplotlib`
  - MoviePy
    - `pip install moviepy`
+   
+To install all dependencies available on pip, run this command:
+
+`pip install opencv-python numpy Pillow PIMS matplotlib moviepy`
