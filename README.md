@@ -7,6 +7,9 @@ Embedded software for AuTonomous Low-Altitude Service drone
 
 ### Dependencies
 
+Note: Before running these install commands, you should create a virtual environment so that the default `python` and
+`pip` commands are version 3, instead of 2.
+
  - OpenCV 3.X
    - Installation:
      - Mac: Install Homebrew and run `brew install opencv`
@@ -23,6 +26,19 @@ Embedded software for AuTonomous Low-Altitude Service drone
    - `pip install matplotlib`
  - MoviePy
    - `pip install moviepy`
+ - LibrePilot
+   - TODO: Write a script to automate this
+   - Pull latest librepilot
+   - `git checkout next`
+   - `cd python`
+   - `sed -i '' 's/"".join(map(chr,header))/("".join(map(chr,header))).encode()/g' librepilot/uavtalk/uavtalk.py`
+   - `sed -i '' 's/"".join(map(chr,data))/("".join(map(chr,data))).encode()/g' librepilot/uavtalk/uavtalk.py`
+   - `sed -i '' 's/serial.write(chr(crc.read()))/serial.write(chr(crc.read()).encode())/g' librepilot/uavtalk/uavtalk.py`
+   - `2to3 -wnv .`
+   - `python setup.py build`
+   - `python setup.py install`
+ - PySerial
+   - `pip install pyserial`
    
 To install all dependencies available on pip, run this command:
 
