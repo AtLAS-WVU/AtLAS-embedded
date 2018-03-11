@@ -1,114 +1,129 @@
+#include <TimerOne.h>
 
-#define NUM_CHANNELS 6
-#define PPM_PIN 8
+// There are only 6 usable channels, but for some reason, the receiver outputs 8 PPM
+// channels, where the last 2 just never change.
+#define NUM_CHANNELS 8
+#define PPM_INPUT 2
 
-volatile unsigned long inputPulseWidths[NUM_CHANNELS] = {0};
+// Total width of one PPM frame, in microseconds
+#define FRAME_WIDTH 20000
+// Pin on which to output a PPM signal
+#define PPM_OUTPUT 8
 
-/*
- * PPM generator originally written by David Hasko
- * on https://code.google.com/p/generate-ppm-signal/ 
- * 
- * With modifications by Timothy Scott
- */
+// Channels of remote controller inputs and outputs
+// Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
+// GCS software use 1-based index. Therefore, channel 0 here corresponds to channel 1 of the
+// remote control and GCS, and so on.
+#define THROTTLE_CH 2
+#define ROLL_CH 0
+#define PITCH_CH 1
+#define YAW_CH 3
+#define ARM_CH 4
+#define FLIGHT_MODE_CH 5
 
-//////////////////////CONFIGURATION///////////////////////////////
-#define CHANNEL_DEFAULT_VALUE 1500  //set the default servo value
-#define FRAME_LENGTH 22500  //set the PPM frame length in microseconds (1ms = 1000µs)
-#define PULSE_LENGTH 300  //set the pulse length
-#define ON_STATE 1  //set polarity of the pulses: 1 is positive, 0 is negative
-#define PPM_OUT 10  //set PPM signal output pin on the arduino
-
-/*this array holds the servo values for the ppm signal
- change theese values in your code (usually servo values move between 1000 and 2000)*/
-int ppm[NUM_CHANNELS];
+// Constantly updates to store the current values of the ppm inputs
+volatile unsigned int ppmInput[NUM_CHANNELS] = {0};
+// Change this array at any time to change the PPM output
+volatile unsigned int ppmOutput[NUM_CHANNELS] = {0};
 
 void setup() {
-    pinMode(PPM_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(PPM_PIN), ppmInterrupt, FALLING);
+    pinMode(PPM_INPUT, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PPM_INPUT), ppmInterrupt, RISING);
     Serial.begin(115200);
-    pinMode(8, OUTPUT);
 
-    // initiallize default ppm values
-    for(int i=0; i < NUM_CHANNELS; i++){
-        ppm[i] = CHANNEL_DEFAULT_VALUE;
+    for(int i = 0; i < NUM_CHANNELS; i++){
+        ppmOutput[i] = 1500;
     }
-    
-    pinMode(PPM_OUT, OUTPUT);
-    digitalWrite(PPM_OUT, !ON_STATE);  //set the PPM signal pin to the default state (off)
-    
-    cli();
-    TCCR1A = 0; // set entire TCCR1 register to 0
-    TCCR1B = 0;
-    
-    OCR1A = 100;  // compare match register, change this
-    TCCR1B |= (1 << WGM12);  // turn on CTC mode
-    TCCR1B |= (1 << CS11);  // 8 prescaler: 0,5 microseconds at 16mhz
-    TIMSK1 |= (1 << OCIE1A); // enable timer compare interrupt
-    sei();
-
+    pinMode(PPM_OUTPUT, OUTPUT);
+    Timer1.initialize(1000);
+    Timer1.attachInterrupt(&ppmOutputInterrupt, 1000);
 }
 
-
+unsigned long lastPrint = 0;
 
 void loop() {
 
-    if((millis() / 3000) % 2){
+//    ppmOutput[3] = ((millis() % 2000) / 2) + 1000;
+//
+//    if(millis() - lastPrint > 500){
+        lastPrint = millis();
         for(int i = 0; i < NUM_CHANNELS; i++){
-            ppm[i] = 1000 + (i * 200);
+            Serial.print(ppmInput[i]);
+            //sum += ppmInput[i];
+            Serial.print(", ");
         }
-    }else{
-        for(int i = 0; i < NUM_CHANNELS; i++){
-            ppm[i] = 1000;
-        }
-    }
-
-    for(int i = 0; i < NUM_CHANNELS; i++){
-        Serial.print(inputPulseWidths[i]);
-        Serial.print(", ");
-    }
-    Serial.println("");
-    delay(1000);
+        //Serial.print(sum);
+        Serial.println("");
+        delay(500);
+//    }
+//    delay(500);
+//    for(int i = 0; i < NUM_CHANNELS; i++){
+//        ppmOutput[i] = ppmInput[i];
+//    }
 }
 
 volatile int currentChannel = 0;
 volatile unsigned long lastPulseStart = 0;
+volatile unsigned int duration = 0;
 
 void ppmInterrupt(){
-    // TODO: Replace with TCNT1
+    // TODO: Replace with TCNT0 somehow
     unsigned long currentTime = micros();
-    inputPulseWidths[currentChannel] = currentTime - lastPulseStart;
+    duration = currentTime - lastPulseStart;
     lastPulseStart = currentTime;
-    currentChannel = (currentChannel + 1) % NUM_CHANNELS;
-}
-
-ISR(TIMER1_COMPA_vect){  //leave this alone
-  static boolean state = true;
-  
-  TCNT1 = 0;
-  
-  if (state) {  //start pulse
-    digitalWrite(PPM_OUT, ON_STATE);
-    OCR1A = PULSE_LENGTH * 2;
-    state = false;
-  } else{  //end pulse and calculate when to start the next pulse
-    static byte cur_chan_numb;
-    static unsigned int calc_rest;
-  
-    digitalWrite(PPM_OUT, !ON_STATE);
-    state = true;
-
-    if(cur_chan_numb >= NUM_CHANNELS){
-      cur_chan_numb = 0;
-      calc_rest = calc_rest + PULSE_LENGTH;// 
-      OCR1A = (FRAME_LENGTH - calc_rest) * 2;
-      calc_rest = 0;
+    if(duration > 3000){
+        currentChannel = 0;
+    }else{
+        ppmInput[currentChannel] = duration;
+        currentChannel = (currentChannel + 1) % NUM_CHANNELS;
     }
-    else{
-      OCR1A = (ppm[cur_chan_numb] - PULSE_LENGTH) * 2;
-      calc_rest = calc_rest + ppm[cur_chan_numb];
-      cur_chan_numb++;
-    }     
-  }
 }
 
+volatile int currentOutputChannel = 0;
+volatile unsigned int timeElapsed;
+
+void ppmOutputInterrupt(){
+    digitalWrite(PPM_OUTPUT, HIGH);
+    digitalWrite(PPM_OUTPUT, LOW);
+    currentOutputChannel++;
+    if(currentOutputChannel == NUM_CHANNELS){
+        Timer1.setPeriod(FRAME_WIDTH - timeElapsed);
+        timeElapsed = 0;
+        currentOutputChannel = -1;
+    }else{
+        Timer1.setPeriod(ppmOutput[currentOutputChannel]);
+        timeElapsed += ppmOutput[currentOutputChannel];
+    }
+}
+//
+//ISR(TIMER1_COMPA_vect){  //leave this alone
+//  static boolean state = true;
+//  
+//  TCNT1 = 0;
+//  
+//  if (state) {  //start pulse
+//    digitalWrite(PPM_OUT, ON_STATE);
+//    OCR1A = PULSE_LENGTH * 2;
+//    state = false;
+//  } else{  //end pulse and calculate when to start the next pulse
+//    static byte cur_chan_numb;
+//    static unsigned int calc_rest;
+//  
+//    digitalWrite(PPM_OUT, !ON_STATE);
+//    state = true;
+//
+//    if(cur_chan_numb >= NUM_CHANNELS){
+//      cur_chan_numb = 0;
+//      calc_rest = calc_rest + PULSE_LENGTH;// 
+//      OCR1A = (FRAME_LENGTH - calc_rest) * 2;
+//      calc_rest = 0;
+//    }
+//    else{
+//      OCR1A = (ppm[cur_chan_numb] - PULSE_LENGTH) * 2;
+//      calc_rest = calc_rest + ppm[cur_chan_numb];
+//      cur_chan_numb++;
+//    }     
+//  }
+//}
+//
 
