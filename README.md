@@ -26,17 +26,6 @@ Note: Before running these install commands, you should create a virtual environ
    - `pip install matplotlib`
  - MoviePy
    - `pip install moviepy`
- - LibrePilot
-   - TODO: Write a script to automate this
-   - Pull latest librepilot
-   - `git checkout next`
-   - `cd python`
-   - `sed -i '' 's/"".join(map(chr,header))/("".join(map(chr,header))).encode()/g' librepilot/uavtalk/uavtalk.py`
-   - `sed -i '' 's/"".join(map(chr,data))/("".join(map(chr,data))).encode()/g' librepilot/uavtalk/uavtalk.py`
-   - `sed -i '' 's/serial.write(chr(crc.read()))/serial.write(chr(crc.read()).encode())/g' librepilot/uavtalk/uavtalk.py`
-   - `2to3 -wnv .`
-   - `python setup.py build`
-   - `python setup.py install`
  - PySerial
    - `pip install pyserial`
    

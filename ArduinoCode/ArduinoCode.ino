@@ -3,12 +3,18 @@
 // There are only 6 usable channels, but for some reason, the receiver outputs 8 PPM
 // channels, where the last 2 just never change.
 #define NUM_CHANNELS 8
+
+#define NUM_INPUT_CHANNELS 4
+// Pin for PPM input. Must be either pin 1 or pin 2, because those are the only
+// pins that support interrupts.
 #define PPM_INPUT 2
 
-// Total width of one PPM frame, in microseconds
+// Total width of one PPM frame, in microseconds. This was determined by the receiver.
 #define FRAME_WIDTH 20000
 // Pin on which to output a PPM signal
 #define PPM_OUTPUT 8
+
+#define SERIAL_BAUD_RATE 115200
 
 // Channels of remote controller inputs and outputs
 // Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
@@ -18,8 +24,8 @@
 #define ROLL_CH 0
 #define PITCH_CH 1
 #define YAW_CH 3
-#define ARM_CH 4
-#define FLIGHT_MODE_CH 5
+// This is the channel for the manual control switch
+#define MANUAL_CONTROL_CH 5
 
 // Constantly updates to store the current values of the ppm inputs
 volatile unsigned int ppmInput[NUM_CHANNELS] = {0};
@@ -29,7 +35,7 @@ volatile unsigned int ppmOutput[NUM_CHANNELS] = {0};
 void setup() {
     pinMode(PPM_INPUT, INPUT);
     attachInterrupt(digitalPinToInterrupt(PPM_INPUT), ppmInterrupt, RISING);
-    Serial.begin(115200);
+    Serial.begin(SERIAL_BAUD_RATE);
 
     for(int i = 0; i < NUM_CHANNELS; i++){
         ppmOutput[i] = 1500;
@@ -40,26 +46,30 @@ void setup() {
 }
 
 unsigned long lastPrint = 0;
+unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
 
 void loop() {
-
-//    ppmOutput[3] = ((millis() % 2000) / 2) + 1000;
-//
-//    if(millis() - lastPrint > 500){
-        lastPrint = millis();
+    if(ppmInput[MANUAL_CONTROL_CH] > 1200){
         for(int i = 0; i < NUM_CHANNELS; i++){
-            Serial.print(ppmInput[i]);
-            //sum += ppmInput[i];
-            Serial.print(", ");
+            ppmOutput[i] = ppmInput[i];
         }
-        //Serial.print(sum);
-        Serial.println("");
-        delay(500);
-//    }
-//    delay(500);
-//    for(int i = 0; i < NUM_CHANNELS; i++){
-//        ppmOutput[i] = ppmInput[i];
-//    }
+    }else{
+        if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
+            for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
+                serialInput[i] = Serial.read() << 8 | Serial.read();
+                //Serial.print(serialInput[i]);
+                //Serial.print(", ");
+            }
+            //Serial.println();
+        }
+        int i;
+        for(i = 0; i < NUM_INPUT_CHANNELS; i++){
+            ppmOutput[i] = serialInput[i];
+        }
+        for(; i < NUM_CHANNELS; i++){
+            ppmOutput[i] = 1000;
+        }
+    }
 }
 
 volatile int currentChannel = 0;
