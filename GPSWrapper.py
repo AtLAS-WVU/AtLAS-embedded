@@ -8,6 +8,8 @@ class GPSWrapper():
         time = None
         altitude = None
         speed = None
+	track = None	#Degrees from true north
+	climb = None	#Climb speed in m/s
         mode = 1        #Can be 1(fixing), 2(2D fix), 3(3D fix)
 
         gpsd = None 
@@ -20,6 +22,8 @@ class GPSWrapper():
 		self.time = 0
 		self.altitude = 0.0
 		self.speed = 0
+		self.track = 0
+		self.climb = 0.0
 
         #Function is called to allow drone to acquire and hold a fix on location data before taking off
         #Returns 1 if GPS info has been acquired and held for a period of time, results in a failure otherwise
@@ -53,9 +57,12 @@ class GPSWrapper():
                 self.altitude = gpsd.fix.altitude
                 self.speed = gpsd.fix.speed
                 self.mode = gpsd.fix.mode
+		self.track = gpsd.fix.track
+		self.climb = gpsd.fix.climb
                 gpsd.next()	#grab next set of values
                 return 1	#Success
 
+	#Untested
 	def closeGPSChannel(self):
 		global gpsd
 		gpsd = gps(mode=WATCH_DISABLE)
