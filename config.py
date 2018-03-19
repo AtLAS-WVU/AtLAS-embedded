@@ -8,6 +8,9 @@ CAMERA_RESOLUTION = (1920//4, 1080//4)  # TODO: Adjust to a good resolution
 # TODO: Remove this. It should always be True in production
 RASPBERRY_PI = False
 
+# How often should control signals be sent to the flight controller, in seconds
+UAV_CONTROL_UPDATE_PERIOD = 0.1
+
 
 # Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty.*'
 SERIAL_PORT = "/dev/tty.usbmodem1421"
