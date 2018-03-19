@@ -16,7 +16,7 @@ def calculate_intensity(intensity):
 
 
 # throttle upwards (+) or downwards (-)
-def elevate_cruise(speed):
+def throttle_cruise(speed):
     send_control_signal(calculate_intensity(speed), DEFAULT_DIR, DEFAULT_DIR, DEFAULT_DIR)
 
 
@@ -30,8 +30,8 @@ def roll_cruise(speed):
     send_control_signal(DEFAULT_DIR, DEFAULT_DIR, DEFAULT_DIR, calculate_intensity(speed))
 
 
-# rotate right (+) or left (-)
-def rotate(speed):
+# yaw right (+) or left (-)
+def yaw_cruise(speed):
     send_control_signal(DEFAULT_DIR, DEFAULT_DIR, calculate_intensity(speed), DEFAULT_DIR)
 
 
