@@ -12,7 +12,7 @@ class GPSWrapper():
 	climb = None	#Climb speed in m/s
         mode = 1        #Can be 1(fixing), 2(2D fix), 3(3D fix)
 
-        gpsd = None 
+        gpsd = None
 
         def __init__(self):
                 global gpsd
@@ -48,9 +48,6 @@ class GPSWrapper():
         #Returns 1 if read was successful, 0 if it failed
         def updateGPSValues(self):
                 global gpsd
-                #if gpsd.fix.mode == 1:
-                #       return 0     #Failure
-                #else:
                 self.latitude = gpsd.fix.latitude
                 self.longitude = gpsd.fix.longitude
                 self.time = gpsd.utc
@@ -62,8 +59,33 @@ class GPSWrapper():
                 gpsd.next()	#grab next set of values
                 return 1	#Success
 
-	#Untested
-	def closeGPSChannel(self):
-		global gpsd
-		gpsd = gps(mode=WATCH_DISABLE)
+	   #Untested
+       #def closeGPSChannel(self):
+	          #global gpsd
+		      #gpsd = gps(mode=WATCH_DISABLE)
 
+        def findDistanceBetweenLatLon(self, serverLat, serverLong):
+            R = 6371000 #average radius of earth in meters
+            updateGPSValues()
+            phi1 = math.radians(self.latitude)
+            phi2 = math.radians(serverLat)
+            deltaPhi = math.radians(serverLat - self.latitude)
+            deltaLambda = math.radians(serverLong - self.longitude)
+
+            #Uses Haversine formula to find distance between two points
+            a = math.sin(deltaPhi/2) * math.sin(deltaPhi/2) + (math.cos(phi1) * math.cos(phi2)) * (sin(deltaLambda/2) * sin(deltaLambda/2))
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            distance = R * c
+            return distance
+
+        def findCurrentBearing(self, destLat, destLong):
+            updateGPSValues()
+            curRadLat = math.radians(self.latitude)
+            curRadLong = math.radians(self.longitude)
+            destRadLat = math.radians(destLat)
+            destRadLong = math.radians(destLong)
+
+            val1 = math.sin(destRadLong - curRadLong) * math.cos(destRadLat)
+            val2 = math.cos(curRadLat) * math.sin(destRadLat) - math.sin(curRadLat) * math.cos(destRadLat) * math.cos(destRadLong - curRadLong)
+            bearing = math.degrees(math.atan2(val1, val2))
+            return bearing
