@@ -22,8 +22,9 @@
 #define NUM_SENSORS 4
 
 #define LEDDAR_SENSOR_NUM 0
-const int SONAR_SENSOR_NUMS[3] = {1, 2, 3};
-const int SONAR_SENSOR_PINS[3] = {13, 12, 11};
+#define NUM_SONAR_SENSORS 3
+const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {1, 2, 3};
+const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12, 11};
 
 // Channels of remote controller inputs and outputs
 // Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
