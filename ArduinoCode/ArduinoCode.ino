@@ -9,12 +9,21 @@
 // pins that support interrupts.
 #define PPM_INPUT 2
 
+// If no serial signal is received in this many milliseconds, then switch to manual control
+#define SERIAL_TIMEOUT 500
+
 // Total width of one PPM frame, in microseconds. This was determined by the receiver.
 #define FRAME_WIDTH 20000
 // Pin on which to output a PPM signal
 #define PPM_OUTPUT 8
 
 #define SERIAL_BAUD_RATE 115200
+
+#define NUM_SENSORS 4
+
+#define LEDDAR_SENSOR_NUM 0
+const int SONAR_SENSOR_NUMS[3] = {1, 2, 3};
+const int SONAR_SENSOR_PINS[3] = {13, 12, 11};
 
 // Channels of remote controller inputs and outputs
 // Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
@@ -32,6 +41,9 @@ volatile unsigned int ppmInput[NUM_CHANNELS] = {0};
 // Change this array at any time to change the PPM output
 volatile unsigned int ppmOutput[NUM_CHANNELS] = {0};
 
+unsigned long lastSerialReceived = 0;
+volatile bool serialDisconnected = true;
+
 void setup() {
     pinMode(PPM_INPUT, INPUT);
     attachInterrupt(digitalPinToInterrupt(PPM_INPUT), ppmInterrupt, RISING);
@@ -48,20 +60,33 @@ void setup() {
 unsigned long lastPrint = 0;
 unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
 
+uint16_t sensorBuffer[NUM_SENSORS] = {0};
+
 void loop() {
-    if(ppmInput[MANUAL_CONTROL_CH] > 1200){
+    if(ppmInput[MANUAL_CONTROL_CH] > 1200 || serialDisconnected){
         for(int i = 0; i < NUM_CHANNELS; i++){
             ppmOutput[i] = ppmInput[i];
         }
-    }else{
-        if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
-            for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
-                serialInput[i] = Serial.read() << 8 | Serial.read();
-                //Serial.print(serialInput[i]);
-                //Serial.print(", ");
-            }
-            //Serial.println();
+    }
+    
+    if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
+        lastSerialReceived = millis();
+        serialDisconnected = false;
+        for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
+            serialInput[i] = Serial.read() << 8 | Serial.read();
+            //Serial.print(serialInput[i]);
+            //Serial.print(", ");
         }
+        Serial.write(reinterpret_cast<uint8_t*>(sensorBuffer), NUM_SENSORS * 2);
+    }else if(millis() - lastSerialReceived > SERIAL_TIMEOUT){
+        serialDisconnected = true;
+        serialInput[THROTTLE_CH] = 1000;
+        serialInput[ROLL_CH] = 1500;
+        serialInput[YAW_CH] = 1500;
+        serialInput[PITCH_CH] = 1500;
+    }
+
+    if(!serialDisconnected && ppmInput[MANUAL_CONTROL_CH] < 1200){
         int i;
         for(i = 0; i < NUM_INPUT_CHANNELS; i++){
             ppmOutput[i] = serialInput[i];
@@ -70,6 +95,16 @@ void loop() {
             ppmOutput[i] = 1000;
         }
     }
+
+    sensorBuffer[LEDDAR_SENSOR_NUM] = millis() / 100;
+    sensorBuffer[1] = millis() / 1000;
+    sensorBuffer[2] = millis() / 500;
+    sensorBuffer[3] = millis() / 250;
+//    for(int i = 0; i < NUM_CHANNELS; i++){
+//        Serial.print(ppmInput[i]);
+//        Serial.print(", ");
+//    }
+//    Serial.println("");
 }
 
 volatile int currentChannel = 0;
@@ -105,35 +140,4 @@ void ppmOutputInterrupt(){
         timeElapsed += ppmOutput[currentOutputChannel];
     }
 }
-//
-//ISR(TIMER1_COMPA_vect){  //leave this alone
-//  static boolean state = true;
-//  
-//  TCNT1 = 0;
-//  
-//  if (state) {  //start pulse
-//    digitalWrite(PPM_OUT, ON_STATE);
-//    OCR1A = PULSE_LENGTH * 2;
-//    state = false;
-//  } else{  //end pulse and calculate when to start the next pulse
-//    static byte cur_chan_numb;
-//    static unsigned int calc_rest;
-//  
-//    digitalWrite(PPM_OUT, !ON_STATE);
-//    state = true;
-//
-//    if(cur_chan_numb >= NUM_CHANNELS){
-//      cur_chan_numb = 0;
-//      calc_rest = calc_rest + PULSE_LENGTH;// 
-//      OCR1A = (FRAME_LENGTH - calc_rest) * 2;
-//      calc_rest = 0;
-//    }
-//    else{
-//      OCR1A = (ppm[cur_chan_numb] - PULSE_LENGTH) * 2;
-//      calc_rest = calc_rest + ppm[cur_chan_numb];
-//      cur_chan_numb++;
-//    }     
-//  }
-//}
-//
 
