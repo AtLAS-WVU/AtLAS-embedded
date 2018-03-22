@@ -1,29 +1,31 @@
 import os
 import time
+import threading
 from gps import *
 
-class GPSWrapper():
+class GPSWrapper(threading.Thread):
         latitude = None
         longitude = None
         time = None
         altitude = None
         speed = None
-	track = None	#Degrees from true north
+	track = None	#Degrees from true north (should be checked with bearing)
 	climb = None	#Climb speed in m/s
         mode = 1        #Can be 1(fixing), 2(2D fix), 3(3D fix)
 
         gpsd = None
 
         def __init__(self):
+		threading.Thread.__init__(self)
                 global gpsd
                 gpsd = gps(mode=WATCH_ENABLE)
-		self.latitude = 0.0
-		self.longitude = 0.0
-		self.time = 0
-		self.altitude = 0.0
-		self.speed = 0
-		self.track = 0
-		self.climb = 0.0
+		self.current_value = None
+		self.running = True
+
+	def run(self):
+		global gpsd
+		while self.running:
+			self.updateGPSValues()
 
         #Function is called to allow drone to acquire and hold a fix on location data before taking off
         #Returns 1 if GPS info has been acquired and held for a period of time, results in a failure otherwise
@@ -31,9 +33,9 @@ class GPSWrapper():
                 global gpsd
                 timeElapsed = 0
                 gpsd.next()
-                while gpsd.fix.mode == 1 and self.latitude == 0:
+                while gpsd.fix.mode != 2 and gpsd.fix.mode != 3:
                         #os.system('clear')
-                        print 'Waiting for fix (', timeElapsed, ' sec)'
+                        #print 'Waiting for fix (', timeElapsed, ' sec)'
                         time.sleep(1)
                         timeElapsed +=1
                         gpsd.next()
@@ -59,11 +61,9 @@ class GPSWrapper():
                 gpsd.next()	#grab next set of values
                 return 1	#Success
 
-	   #Untested
-       #def closeGPSChannel(self):
-	          #global gpsd
-		      #gpsd = gps(mode=WATCH_DISABLE)
 
+	#Function is called to calculate the distance between the current drone location and the destination
+	#Returns the calculated distance
         def findDistanceBetweenLatLon(self, serverLat, serverLong):
             R = 6371000 #average radius of earth in meters
             updateGPSValues()
@@ -78,6 +78,8 @@ class GPSWrapper():
             distance = R * c
             return distance
 
+	#Function is called to calculate the bearing (position of drone relative to destination)
+	#Returns the calculated bearing
         def findCurrentBearing(self, destLat, destLong):
             updateGPSValues()
             curRadLat = math.radians(self.latitude)
