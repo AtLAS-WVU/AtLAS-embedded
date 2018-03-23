@@ -2,10 +2,12 @@ import os
 import time
 import math
 import threading
-from gps import *
+import time
+#from gps import *
+from gpspy3.gps import *
 
 
-class GPSWrapper(threading.Thread):
+class __GPSWrapper(threading.Thread):
     latitude = None
     longitude = None
     time = None
@@ -14,18 +16,20 @@ class GPSWrapper(threading.Thread):
     track = None  # Degrees from true north (should be checked with bearing)
     climb = None  # Climb speed in m/s
     mode = 1      # Can be 1(fixing), 2(2D fix), 3(3D fix)
+    ready = False
 
     def __init__(self):
-        super().__init__(self)
-        self.gpsd = gps(mode=WATCH_ENABLE)
+        super().__init__()
+        self.gpsd = GPS(mode=WATCH_ENABLE)
         self.current_value = None
         self.running = True
 
     def run(self):
         self.waitForFix()
+        self.ready = True
         while self.running:
             self.updateGPSValues()
-            print("Updated gps. Lat: {}, Lon: {}".format(self.latitude, self.longitude))
+            # print("Updated gps. Lat: {}, Lon: {}".format(self.latitude, self.longitude))
 
     # Function is called to allow drone to acquire and hold a fix on location data before taking off
     # Returns 1 if GPS info has been acquired and held for a period of time, results in a failure otherwise
@@ -48,6 +52,11 @@ class GPSWrapper(threading.Thread):
     # Function is called to retrieve the newest values from the GPS
     # Returns 1 if read was successful, 0 if it failed
     def updateGPSValues(self):
+        try:
+            self.gpsd.next()  # grab next set of values
+        except StopIteration:
+            print("Failed, try again later")
+            return 0
         self.latitude = self.gpsd.fix.latitude
         self.longitude = self.gpsd.fix.longitude
         self.time = self.gpsd.utc
@@ -56,7 +65,6 @@ class GPSWrapper(threading.Thread):
         self.mode = self.gpsd.fix.mode
         self.track = self.gpsd.fix.track
         self.climb = self.gpsd.fix.climb
-        self.gpsd.next()	 # grab next set of values
         return 1	 # Success
 
     # Function is called to calculate the distance between the current drone location and the destination
@@ -90,3 +98,29 @@ class GPSWrapper(threading.Thread):
                                                             math.cos(destRadLong - curRadLong)
         bearing = math.degrees(math.atan2(val1, val2))
         return bearing
+
+
+thread = __GPSWrapper()
+
+while not thread.ready:
+     time.sleep(0.5)
+
+
+def get_distance_to(lat, lon):
+    """
+    Calculates the distance in meters from the drone's current GPS location to the given latitude and longitude
+    :param lat: Destination latitude, in degrees
+    :param lon: Destination longitude, in degrees
+    :return: Distance to the given coordinates, in meters
+    """
+    return thread.findDistanceBetweenLatLon(lat, lon)
+
+
+def get_bearing_to(lat, lon):
+    """
+    Calculates the direction the drone needs to travel to get to the given destination.
+    :param lat: Destination latitude, in degrees
+    :param lon: Destination longitude, in degrees
+    :return: Bearing to the destination coordinates, in degrees
+    """
+    return thread.findCurrentBearing(lat, lon)

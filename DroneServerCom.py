@@ -1,13 +1,13 @@
 import requests
 import time
 import os
-from GPSWrapper import *
+import GPSWrapper
 #Specifies where to send data to
 API_DESTINATION = "https://deliverwithatlas.com/UpdateDroneStatus.php"
 
 #Creates a gps object that holds all values to be sent to server
 #Communicates via threads to constantly send new coordinates every second
-gps = GPSWrapper()
+gps = GPSWrapper.thread
 
 #Set default values for aircraft being used
 droneID = 55560935
