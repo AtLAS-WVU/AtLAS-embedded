@@ -19,12 +19,32 @@
 
 #define SERIAL_BAUD_RATE 115200
 
+// Total number of sensors on the drone, including remote control inputs
 #define NUM_SENSORS 4
 
+// Index of the Leddar sensor
 #define LEDDAR_SENSOR_NUM 0
+// How many sonar sensors
 #define NUM_SONAR_SENSORS 3
+// Indexes of the sonar sensors
 const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {1, 2, 3};
+// Pins of the sonar sensors
 const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12, 11};
+// When the last sonar echo pulse started
+volatile unsigned long sonarPulseStart = 0;
+// When the last sonar echo pulse ended
+volatile unsigned long sonarPulseEnd = 0;
+// Pin to connect all of the sonar inputs to
+// TODO: This doesn't actually work
+#define SONAR_ECHO_INPUT 3
+// Index of the current sonar senor that is waiting for a pulse
+volatile int currentSonarSensor = 0;
+
+// Speed of sound in centimeters per microsecond
+#define SPEED_OF_SOUND 0.0343
+
+// For sonar sensors
+#define MAX_PULSE_DURATION 30000
 
 // Channels of remote controller inputs and outputs
 // Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
@@ -42,7 +62,9 @@ volatile unsigned int ppmInput[NUM_CHANNELS] = {0};
 // Change this array at any time to change the PPM output
 volatile unsigned int ppmOutput[NUM_CHANNELS] = {0};
 
+// Time that serial information was last received
 unsigned long lastSerialReceived = 0;
+// True if it's been more than SERIAL_TIMEOUT milliseconds since the last serial input
 volatile bool serialDisconnected = true;
 
 void setup() {
@@ -56,9 +78,15 @@ void setup() {
     pinMode(PPM_OUTPUT, OUTPUT);
     Timer1.initialize(1000);
     Timer1.attachInterrupt(&ppmOutputInterrupt, 1000);
+
+    for(int i = 0; i < NUM_SONAR_SENSORS; i++){
+        pinMode(SONAR_SENSOR_PINS[i], OUTPUT);
+    }
+
+    pinMode(SONAR_ECHO_INPUT, INPUT);
+    attachInterrupt(digitalPinToInterrupt(SONAR_ECHO_INPUT), sonarInputInterrupt, CHANGE);
 }
 
-unsigned long lastPrint = 0;
 unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
 
 uint16_t sensorBuffer[NUM_SENSORS] = {0};
@@ -97,15 +125,21 @@ void loop() {
         }
     }
 
-    sensorBuffer[LEDDAR_SENSOR_NUM] = millis() / 100;
-    sensorBuffer[1] = millis() / 1000;
-    sensorBuffer[2] = millis() / 500;
-    sensorBuffer[3] = millis() / 250;
-//    for(int i = 0; i < NUM_CHANNELS; i++){
-//        Serial.print(ppmInput[i]);
+//    if(sonarPulseEnd > sonarPulseStart || micros() - sonarPulseStart > MAX_PULSE_DURATION){
+//        sensorBuffer[SONAR_SENSOR_NUMS[currentSonarSensor]] = (uint8_t)((sonarPulseEnd - sonarPulseStart) * SPEED_OF_SOUND / 2.0);
+//        currentSonarSensor = (currentSonarSensor + 1) % NUM_SONAR_SENSORS;
+//        digitalWrite(SONAR_SENSOR_PINS[currentSonarSensor], HIGH);
+//        delayMicroseconds(10);
+//        digitalWrite(SONAR_SENSOR_PINS[currentSonarSensor], LOW);
+//    }
+//
+//    for(int i = 0; i < NUM_SENSORS; i++){
+//        Serial.print(sensorBuffer[i]);
 //        Serial.print(", ");
 //    }
-//    Serial.println("");
+//    Serial.println(currentSonarSensor);
+//
+//    delay(100);
 }
 
 volatile int currentChannel = 0;
@@ -139,6 +173,16 @@ void ppmOutputInterrupt(){
     }else{
         Timer1.setPeriod(ppmOutput[currentOutputChannel]);
         timeElapsed += ppmOutput[currentOutputChannel];
+    }
+}
+
+
+// TODO: Fix this
+void sonarInputInterrupt(){
+    if(digitalRead(SONAR_ECHO_INPUT) == HIGH){
+        sonarPulseStart = micros();
+    }else{
+        sonarPulseEnd = micros();
     }
 }
 
