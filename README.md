@@ -28,6 +28,10 @@ Note: Before running these install commands, you should create a virtual environ
    - `pip install moviepy`
  - PySerial
    - `pip install pyserial`
+ - GPS-python3
+   - Make sure to be in the root directory of this repository when running this command, because it installs gps-python3
+   from a folder rather than from PyPI
+   - `pip install gps-python3/`
    
 To install all dependencies available on pip, run this command:
 
