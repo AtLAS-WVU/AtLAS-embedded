@@ -20,16 +20,18 @@
 #define SERIAL_BAUD_RATE 115200
 
 // Total number of sensors on the drone, including remote control inputs
-#define NUM_SENSORS 4
+#define NUM_SENSORS 10
 
 // Index of the Leddar sensor
-#define LEDDAR_SENSOR_NUM 0
+#define LEDDAR_SENSOR_NUM 6
+
+#define COMPASS_SENSOR_NUM 7
 // How many sonar sensors
-#define NUM_SONAR_SENSORS 3
+#define NUM_SONAR_SENSORS 2
 // Indexes of the sonar sensors
-const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {1, 2, 3};
+const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {8, 9};
 // Pins of the sonar sensors
-const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12, 11};
+const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12};
 // When the last sonar echo pulse started
 volatile unsigned long sonarPulseStart = 0;
 // When the last sonar echo pulse ended
@@ -54,6 +56,7 @@ volatile int currentSonarSensor = 0;
 #define ROLL_CH 0
 #define PITCH_CH 1
 #define YAW_CH 3
+#define AUX_CH 4
 // This is the channel for the manual control switch
 #define MANUAL_CONTROL_CH 5
 
@@ -124,6 +127,15 @@ void loop() {
             ppmOutput[i] = 1000;
         }
     }
+
+    sensorBuffer[ROLL_CH] = (uint16_t) ppmInput[ROLL_CH];
+    sensorBuffer[PITCH_CH] = (uint16_t) ppmInput[PITCH_CH];
+    sensorBuffer[YAW_CH] = (uint16_t) ppmInput[YAW_CH];
+    sensorBuffer[THROTTLE_CH] = (uint16_t) ppmInput[THROTTLE_CH];
+    sensorBuffer[AUX_CH] = (uint16_t) ppmInput[AUX_CH];
+    sensorBuffer[MANUAL_CONTROL_CH] = (uint16_t) ppmInput[MANUAL_CONTROL_CH];
+
+    sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
 
 //    if(sonarPulseEnd > sonarPulseStart || micros() - sonarPulseStart > MAX_PULSE_DURATION){
 //        sensorBuffer[SONAR_SENSOR_NUMS[currentSonarSensor]] = (uint8_t)((sonarPulseEnd - sonarPulseStart) * SPEED_OF_SOUND / 2.0);

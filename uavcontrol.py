@@ -2,7 +2,8 @@ import serial
 import threading
 import time
 from config import SERIAL_BAUD_RATE, SERIAL_PORT, THROTTLE_CHANNEL, PITCH_CHANNEL, YAW_CHANNEL, ROLL_CHANNEL, \
-    UAV_CONTROL_UPDATE_PERIOD, NUM_SENSORS, LEDDAR_SENSOR_NUM, NUM_SONAR_SENSORS, SONAR_SENSOR_NUMS
+    AUX_CHANNEL, MANUAL_CONTROL_CH, UAV_CONTROL_UPDATE_PERIOD, NUM_SENSORS, LEDDAR_SENSOR_NUM, SONAR_SENSOR_NUMS, \
+    COMPASS_SENSOR_NUM
 
 
 MIN_DIR = 1000
@@ -43,12 +44,29 @@ class __UavControlThread(threading.Thread):
     def __read_sensors(self):
         # print("Reading sensors...")
         # print("Num bytes available: {}".format(self.serial_port.in_waiting))
-        self.sensor_buffer = self.serial_port.read(NUM_SENSORS * 2, )
+        self.sensor_buffer = self.serial_port.read(NUM_SENSORS * 2)
 
 
 __thread = __UavControlThread()
 __thread.start()
-thread = __thread
+
+# Wait for the thread to make initial connection with the arduino.
+while __thread.sensor_buffer is None:
+    time.sleep(0.01)
+
+
+def convert_bytes_to_int(bytes_):
+    """
+    Converts a byte string to a single unsigned integer
+    :param bytes_: A little-endian byte string
+    :return: A positive integer
+    """
+    result = 0
+    for byte in reversed(bytes_):
+        result <<= 8
+        result += byte
+    return result
+
 
 def set_throttle(throttle):
     """
@@ -74,9 +92,9 @@ def set_pitch(pitch):
     __thread.pitch = int((pitch / 2 + 0.5) * (MAX_DIR - MIN_DIR) + MIN_DIR)
 
 
-def set_yaw(yaw):
+def set_yaw_signal(yaw):
     """
-    Sets the yaw of the drone.
+    Sets the yaw signal sent to the drone.
     :param yaw: A number between -1 and 1, where 0 is neutral, 1 is full right, and -1 is full left
     :return: None
     :raise: ValueError if yaw is not between -1 and 1
@@ -84,6 +102,10 @@ def set_yaw(yaw):
     if yaw < -1 or yaw > 1:
         raise ValueError("yaw must be between -1 and 1, inclusive")
     __thread.yaw = int((yaw / 2 + 0.5) * (MAX_DIR - MIN_DIR) + MIN_DIR)
+
+
+def set_yaw_hold(yaw):
+    pass
 
 
 def set_roll(roll):
@@ -98,14 +120,84 @@ def set_roll(roll):
     __thread.roll = int((roll / 2 + 0.5) * (MAX_DIR - MIN_DIR) + MIN_DIR)
 
 
-def get_bytes_available():
-    return __thread.serial_port.in_waiting
-
-
 def get_leddar_sensor():
-    return (__thread.sensor_buffer[LEDDAR_SENSOR_NUM * 2 + 1] << 8) + __thread.sensor_buffer[LEDDAR_SENSOR_NUM * 2]
+    """
+    Gets the most recent reading from the LEDdar sensor
+    :return: Distance measured by the sensor, in meters
+    """
+    # TODO: Convert to meters
+    return convert_bytes_to_int(__thread.sensor_buffer[LEDDAR_SENSOR_NUM * 2:LEDDAR_SENSOR_NUM * 2 + 2])
 
 
 def get_sonar_sensors():
-    return [(__thread.sensor_buffer[sensor_num * 2 + 1] << 8) + __thread.sensor_buffer[sensor_num * 2]
+    """
+    Get the most recent readings from all of the sonar sensors.
+    :return: A list of distances read by the sensors, in meters
+    """
+    # TODO: Convert to meters
+    return [convert_bytes_to_int(__thread.sensor_buffer[sensor_num * 2:sensor_num * 2 + 2])
             for sensor_num in SONAR_SENSOR_NUMS]
+
+
+def get_compass_sensor():
+    """
+    Get the most recent reading from the compass
+    :return: Compass bearing, in degrees
+    """
+    # TODO: Convert to degrees
+    return convert_bytes_to_int(__thread.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
+
+
+def __constrain(val, min_=-1, max_=1):
+    if val < min_:
+        return min_
+    elif val > max_:
+        return max_
+    else:
+        return val
+
+
+def get_throttle_input():
+    """
+    :return: The value of the remote control throttle input, in range [0, 1]
+    """
+    throttle = convert_bytes_to_int(__thread.sensor_buffer[THROTTLE_CHANNEL * 2:THROTTLE_CHANNEL * 2 + 2])
+    return __constrain((throttle - 1000) / 1000, min_=0)
+
+
+def get_yaw_input():
+    """
+    :return: The value of the remote control yaw input, in range [-1, 1]
+    """
+    yaw = convert_bytes_to_int(__thread.sensor_buffer[YAW_CHANNEL * 2:YAW_CHANNEL * 2 + 2])
+    return __constrain((yaw - 1500) / 500)
+
+
+def get_pitch_input():
+    """
+    :return: The value of the remote control pitch input, in range [-1, 1]
+    """
+    pitch = convert_bytes_to_int(__thread.sensor_buffer[PITCH_CHANNEL * 2:PITCH_CHANNEL * 2 + 2])
+    return __constrain((pitch - 1500) / 500)
+
+
+def get_roll_input():
+    """
+    :return: The value of the remote control roll input, in range [-1, 1]
+    """
+    roll = convert_bytes_to_int(__thread.sensor_buffer[ROLL_CHANNEL * 2:ROLL_CHANNEL * 2 + 2])
+    return __constrain((roll - 1500) / 500)
+
+
+def get_aux_input():
+    """
+    :return: A boolean. True if the auxiliary switch (the left-most switch on the remote control) is on (flipped down)
+    """
+    return convert_bytes_to_int(__thread.sensor_buffer[AUX_CHANNEL * 2:AUX_CHANNEL * 2 + 2]) > 1500
+
+
+def is_manual_mode():
+    """
+    :return: A boolean. True if the remote control is set to manually control the drone.
+    """
+    return convert_bytes_to_int(__thread.sensor_buffer[MANUAL_CONTROL_CH * 2:MANUAL_CONTROL_CH * 2 + 2]) > 1500

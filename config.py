@@ -9,15 +9,15 @@ CAMERA_RESOLUTION = (1920//4, 1080//4)  # TODO: Adjust to a good resolution
 RASPBERRY_PI = False
 
 # How often should control signals be sent to the flight controller, in seconds
-UAV_CONTROL_UPDATE_PERIOD = 0.1
+UAV_CONTROL_UPDATE_PERIOD = 0.01
 
 
 # Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty.*'
-SERIAL_PORT = "/dev/tty.usbmodem1411"
+SERIAL_PORT = "/dev/tty.usbmodem1421"
 
-############################################################
-### MAKE SURE THESE MATCH THE VALUES IN THE ARDUINO CODE ###
-############################################################
+########################################################
+# MAKE SURE THESE MATCH THE VALUES IN THE ARDUINO CODE #
+########################################################
 # Baud rate for communicating with the arduino.
 SERIAL_BAUD_RATE = 115200
 # Number of PPM channels for controlling the drone. Make sr
@@ -26,8 +26,11 @@ THROTTLE_CHANNEL = 2
 ROLL_CHANNEL = 0
 PITCH_CHANNEL = 1
 YAW_CHANNEL = 3
+AUX_CHANNEL = 4
+MANUAL_CONTROL_CH = 5
 
-NUM_SENSORS = 4
-NUM_SONAR_SENSORS = 3
-LEDDAR_SENSOR_NUM = 0
-SONAR_SENSOR_NUMS = [1, 2, 3]
+NUM_SENSORS = 10
+NUM_SONAR_SENSORS = 2
+LEDDAR_SENSOR_NUM = 6
+COMPASS_SENSOR_NUM = 7
+SONAR_SENSOR_NUMS = [8, 9]
