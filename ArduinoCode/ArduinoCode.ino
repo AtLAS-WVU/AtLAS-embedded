@@ -86,17 +86,18 @@ volatile unsigned int ppmOutput[NUM_CHANNELS] = {0};
 unsigned long lastSerialReceived = 0;
 // True if it's been more than SERIAL_TIMEOUT milliseconds since the last serial input
 volatile bool serialDisconnected = true;
+volatile bool manualSwitch = false;
 
 void setup() {
-
-  //Added pin mappings for sonar sensors
-  pinMode(triggerPin1, OUTPUT);
-  pinMode(echoPin1, INPUT);
-  pinMode(triggerPin2, OUTPUT);
-  pinMode(echoPin2, INPUT);
-  //Attach sonarISR to interrupt to activate second sonar sensor once
-  //first sensor has finished detection
-  attachInterrupt(digitalPinToInterrupt(echoPin1), sonarISR, FALLING);
+    
+    //Added pin mappings for sonar sensors
+    pinMode(triggerPin1, OUTPUT);
+    pinMode(echoPin1, INPUT);
+    pinMode(triggerPin2, OUTPUT);
+    pinMode(echoPin2, INPUT);
+    //Attach sonarISR to interrupt to activate second sonar sensor once
+    //first sensor has finished detection
+    attachInterrupt(digitalPinToInterrupt(echoPin1), sonarISR, FALLING);
   
     pinMode(PPM_INPUT, INPUT);
     attachInterrupt(digitalPinToInterrupt(PPM_INPUT), ppmInterrupt, RISING);
@@ -114,25 +115,19 @@ void setup() {
     }
 
     pinMode(SONAR_ECHO_INPUT, INPUT);
-    attachInterrupt(digitalPinToInterrupt(SONAR_ECHO_INPUT), sonarInputInterrupt, CHANGE);
 }
 
-unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
+volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
 
 uint16_t sensorBuffer[NUM_SENSORS] = {0};
 
 void loop() {
-    if(ppmInput[MANUAL_CONTROL_CH] > 1200 || serialDisconnected){
-        for(int i = 0; i < NUM_CHANNELS; i++){
-            ppmOutput[i] = ppmInput[i];
-        }
-    }
-    
     if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
         lastSerialReceived = millis();
         serialDisconnected = false;
         for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
             serialInput[i] = Serial.read() << 8 | Serial.read();
+            ppmOutput[i] = serialInput[i];
             //Serial.print(serialInput[i]);
             //Serial.print(", ");
         }
@@ -145,16 +140,6 @@ void loop() {
         serialInput[PITCH_CH] = 1500;
     }
 
-    if(!serialDisconnected && ppmInput[MANUAL_CONTROL_CH] < 1200){
-        int i;
-        for(i = 0; i < NUM_INPUT_CHANNELS; i++){
-            ppmOutput[i] = serialInput[i];
-        }
-        for(; i < NUM_CHANNELS; i++){
-            ppmOutput[i] = 1000;
-        }
-    }
-
     sensorBuffer[ROLL_CH] = (uint16_t) ppmInput[ROLL_CH];
     sensorBuffer[PITCH_CH] = (uint16_t) ppmInput[PITCH_CH];
     sensorBuffer[YAW_CH] = (uint16_t) ppmInput[YAW_CH];
@@ -164,35 +149,36 @@ void loop() {
 
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
     
-    //Begin code to poll first sonar sensor
-    //Writes an initial LOW value to pin to ensure it is not high
-    digitalWrite(triggerPin1, LOW);
-    delayMicroseconds(2);
-
-    //Then a HIGH value is written to send initial signal
-    //which is sent for 10 micro
-    digitalWrite(triggerPin1, HIGH);
-    delayMicroseconds(10);
-    //Signal is then stopped by writing LOW to pin
-    digitalWrite(triggerPin1, LOW);
-
-    //Then record how long pulse is detected once bounced back from obstacle
-    //and records time as long as pin is pulled HIGH
-    duration1 = pulseIn(echoPin1, HIGH);
-    //.000343 - meters, .0343 - cm, .343 - mm
-    distance1 = duration1*.343/2;
-
-    //Debug print statements
-    //Serial.print("Distance(1): ");
-    //Serial.println(distance1);
+//    //Begin code to poll first sonar sensor
+//    //Writes an initial LOW value to pin to ensure it is not high
+//    digitalWrite(triggerPin1, LOW);
+//    delayMicroseconds(2);
+//
+//    //Then a HIGH value is written to send initial signal
+//    //which is sent for 10 micro
+//    digitalWrite(triggerPin1, HIGH);
+//    delayMicroseconds(10);
+//    //Signal is then stopped by writing LOW to pin
+//    digitalWrite(triggerPin1, LOW);
+//
+//    //Then record how long pulse is detected once bounced back from obstacle
+//    //and records time as long as pin is pulled HIGH
+//    duration1 = pulseIn(echoPin1, HIGH);
+//    //.000343 - meters, .0343 - cm, .343 - mm
+//    distance1 = duration1*.343/2;
+//
+//    //Debug print statements
+//    //Serial.print("Distance(1): ");
+//    //Serial.println(distance1);
 }
 
-volatile int currentChannel = 0;
-volatile unsigned long lastPulseStart = 0;
-volatile unsigned int duration = 0;
+
 
 void ppmInterrupt(){
-    // TODO: Replace with TCNT0 somehow
+    static int currentChannel = 0;
+    static unsigned long lastPulseStart = 0;
+    static unsigned int duration = 0;
+
     unsigned long currentTime = micros();
     duration = currentTime - lastPulseStart;
     lastPulseStart = currentTime;
@@ -200,35 +186,33 @@ void ppmInterrupt(){
         currentChannel = 0;
     }else{
         ppmInput[currentChannel] = duration;
+        if(currentChannel == MANUAL_CONTROL_CH){
+            manualSwitch = duration > 1200;
+        }
         currentChannel = (currentChannel + 1) % NUM_CHANNELS;
     }
 }
 
-volatile int currentOutputChannel = 0;
-volatile unsigned int timeElapsed;
-
 void ppmOutputInterrupt(){
+    static int currentOutputChannel = 0;
+    static unsigned int timeElapsed;
+    
     digitalWrite(PPM_OUTPUT, HIGH);
     digitalWrite(PPM_OUTPUT, LOW);
     currentOutputChannel++;
+    static unsigned int period = 0;
     if(currentOutputChannel == NUM_CHANNELS){
-        Timer1.setPeriod(FRAME_WIDTH - timeElapsed);
+        period = FRAME_WIDTH - timeElapsed;
         timeElapsed = 0;
         currentOutputChannel = -1;
+    }else if(serialDisconnected || manualSwitch){
+        period = ppmInput[currentOutputChannel];
+        timeElapsed += period;
     }else{
-        Timer1.setPeriod(ppmOutput[currentOutputChannel]);
-        timeElapsed += ppmOutput[currentOutputChannel];
+        period = ppmOutput[currentOutputChannel];
+        timeElapsed += period;
     }
-}
-
-
-// TODO: Fix this
-void sonarInputInterrupt(){
-    if(digitalRead(SONAR_ECHO_INPUT) == HIGH){
-        sonarPulseStart = micros();
-    }else{
-        sonarPulseEnd = micros();
-    }
+    Timer1.setPeriod(period);
 }
 
 void sonarISR(){
