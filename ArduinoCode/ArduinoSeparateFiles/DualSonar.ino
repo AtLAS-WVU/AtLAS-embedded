@@ -17,7 +17,6 @@ int distance1;
 long duration2;
 int distance2;
 
-
 void setup() {
   pinMode(triggerPin1, OUTPUT);
   pinMode(echoPin1, INPUT);
