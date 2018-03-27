@@ -41,7 +41,10 @@ class __GPSWrapper(threading.Thread):
             # print 'Waiting for fix (', timeElapsed, ' sec)'
             time.sleep(1)
             timeElapsed += 1
-            self.gpsd.next()
+            try:
+                self.gpsd.next()
+            except StopIteration:
+                print("Error connecting to GPSD, trying again.")
         if self.gpsd.fix.mode == 2 or self.gpsd.fix.mode == 3:
             time.sleep(3)
             if self.gpsd.fix.mode == 2 or self.gpsd.fix.mode == 3:
@@ -55,7 +58,6 @@ class __GPSWrapper(threading.Thread):
         try:
             self.gpsd.next()  # grab next set of values
         except StopIteration:
-            print("Failed, try again later")
             return 0
         self.latitude = self.gpsd.fix.latitude
         self.longitude = self.gpsd.fix.longitude
@@ -101,9 +103,10 @@ class __GPSWrapper(threading.Thread):
 
 
 thread = __GPSWrapper()
+thread.start()
 
 while not thread.ready:
-     time.sleep(0.5)
+    time.sleep(0.5)
 
 
 def get_distance_to(lat, lon):
