@@ -28,13 +28,22 @@ class Pid:
             this loop was called.
         :return: Correction value
         """
-        if derivative is None:
-            derivative = (error - self.prev_error) / delta_time
         if delta_time is None:
             delta_time = time.time() - self.prev_time
+        if derivative is None:
+            derivative = (error - self.prev_error) / delta_time
 
         self.prev_time = time.time()
         self.prev_error = error
         self.integral += (error * delta_time)
 
         return (self.p * error) + (self.i * self.integral) + (self.d * derivative)
+
+    def reset(self):
+        """
+        Resets the PID loop like it's never been updated before. (Zeros out the integral and prior error)
+        :return: None
+        """
+        self.prev_time = time.time()
+        self.integral = 0
+        self.prev_error = 0
