@@ -2,9 +2,10 @@ import os
 import time
 import math
 import threading
-import time
-#from gps import *
 from gpspy3.gps import *
+import logging
+
+logging.getLogger('gpspy3').setLevel(logging.ERROR)
 
 
 class __GPSWrapper(threading.Thread):
@@ -37,8 +38,7 @@ class __GPSWrapper(threading.Thread):
         timeElapsed = 0
         self.gpsd.next()
         while self.gpsd.fix.mode != 2 and self.gpsd.fix.mode != 3:
-            # os.system('clear')
-            # print 'Waiting for fix (', timeElapsed, ' sec)'
+            print("Waiting for GPS fix.")
             time.sleep(1)
             timeElapsed += 1
             try:
