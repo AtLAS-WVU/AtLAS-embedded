@@ -227,8 +227,8 @@ void sensorFusion(){
     my = x * mag_softiron_matrix[1][0] + y * mag_softiron_matrix[1][1] + z * mag_softiron_matrix[1][2];
     mz = x * mag_softiron_matrix[2][0] + y * mag_softiron_matrix[2][1] + z * mag_softiron_matrix[2][2];
     
-    filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
-    //filter.updateIMU(gx, gy, gz, ax, ay, az);
+    //filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
+    filter.updateIMU(gx, gy, gz, ax, ay, az);
     Serial.print("Yaw: ");
     Serial.print(filter.getYaw());
     Serial.print(", Pitch: ");
