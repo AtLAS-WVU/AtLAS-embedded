@@ -87,20 +87,21 @@ long loopStart = -1;
 // Some values taken from the MotionCal program on my laptop.
 // These are only used in the sensorFusion() function.
 // I have temporarily set them to do nothing.
-float mag_offset[3] = {0, 0, 0};
-//float mag_offset[3] = {-1.21f, 33.52f, -6.51f};
-//float mag_softiron_matrix[3][3] = {
-//    {0.963f, -0.021f, -0.026f},
-//    {-0.021f, 1.018f, 0.0f},
-//    {-0.026f, 0.0f, 1.02f}
-//};
+
+float mag_offset[3] = {29.48f, 0.93f, 0.24f};
+float mag_softiron_matrix[3][3] = {
+    {0.950f, -0.015f, -0.007f},
+    {-0.015f, 0.999f, -0.012f},
+    {-0.007f, -0.012f, 1.055f}
+};
+//float mag_offset[3] = {0, 0, 0};
 // To make this matrix have no effect, set it to
 // this identity matrix.
-float mag_softiron_matrix[3][3] = {
-    {1, 0, 0},
-    {0, 1, 0},
-    {0, 0, 1}
-};
+//float mag_softiron_matrix[3][3] = {
+//    {1, 0, 0},
+//    {0, 1, 0},
+//    {0, 0, 1}
+//};
 
 
 void loop() {
@@ -228,7 +229,7 @@ void sensorFusion(){
     mz = x * mag_softiron_matrix[2][0] + y * mag_softiron_matrix[2][1] + z * mag_softiron_matrix[2][2];
     
     //filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
-    filter.updateIMU(gx, gy, gz, ax, ay, az);
+    filter.updateIMU(gx, gy, gz, ax, ay, -az);
     Serial.print("Yaw: ");
     Serial.print(filter.getYaw());
     Serial.print(", Pitch: ");
@@ -254,7 +255,7 @@ void sensorFusion(){
     if(heading < 0){
         heading += 360.0f;
     }
-    heading = updateAverageHeading(heading);
+    //heading = updateAverageHeading(heading);
     Serial.print("), Heading: ");
     Serial.println(heading);
 

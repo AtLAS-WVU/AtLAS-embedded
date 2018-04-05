@@ -1,6 +1,8 @@
-#include <SoftwareSerial.h>
+#include <AltSoftSerial.h>
 #include "LibrePilotSerial.h"
 #include "attitudestate.h"
+#include "magsensor.h"
+#include "flightstatus.h"
 
 //////////////////////////////////////////////////////////////
 ///// The following values must match those in config.py /////
@@ -31,7 +33,7 @@ const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {8, 9};
 // pins that support interrupts.
 #define PPM_INPUT 2
 // Pin on which to output a PPM signal
-#define PPM_OUTPUT 8
+#define PPM_OUTPUT 7
 
 //Trigger - used to send signal out from sensor
 //Echo - used to recieve signal bounced back from obstacle
@@ -46,8 +48,9 @@ const int echoPin2 = 10;
 const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12};
 
 // Pins for serial connection to flight controller
-#define FLIGHT_CONTROLLER_TX 6
-#define FLIGHT_CONTROLLER_RX 7
+// Note: If using the AltSoftSerial library, these are set in stone
+#define FLIGHT_CONTROLLER_TX 9
+#define FLIGHT_CONTROLLER_RX 8
 
 ///////////////////////////////
 ///// Misc. Configuration /////
@@ -112,8 +115,8 @@ unsigned long lastSerialReceived = 0;
 volatile bool serialDisconnected = true;
 volatile bool manualSwitch = false;
 
-SoftwareSerial softSerial(FLIGHT_CONTROLLER_RX, FLIGHT_CONTROLLER_TX);
-LibrePilotSerial lps(&softSerial);
+AltSoftSerial softSerial;
+LibrePilotSerial lps((Stream*) &softSerial);
 
 void setup() {
     
@@ -157,7 +160,7 @@ void setup() {
         pinMode(SONAR_SENSOR_PINS[i], OUTPUT);
     }
 
-    lps.serial->begin(57600);
+    softSerial.begin(57600);
 }
 
 volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
@@ -193,16 +196,10 @@ void loop() {
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
 
     Serial.print(millis());
+    Serial.print(" ");
     Serial.println(" Still running...");
-    delay(500);
 
-//    lps.request(ATTITUDESTATE_OBJID);
-//    boolean ok = lps.receive(ATTITUDESTATE_OBJID, AttitudeStateDataUnion.arr, 200);
-//    if(ok){
-//        Serial.println(AttitudeStateDataUnion.data.Yaw);
-//    }else{
-//        Serial.println("Not OK!!!");
-//    }
+    delay(500);
     
 //    //Begin code to poll first sonar sensor
 //    //Writes an initial LOW value to pin to ensure it is not high
