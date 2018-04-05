@@ -1,21 +1,13 @@
-#include <TimerOne.h>
+#include <SoftwareSerial.h>
+#include "LibrePilotSerial.h"
+#include "attitudestate.h"
 
-// There are only 6 usable channels, but for some reason, the receiver outputs 8 PPM
-// channels, where the last 2 just never change.
-#define NUM_CHANNELS 8
+//////////////////////////////////////////////////////////////
+///// The following values must match those in config.py /////
+//////////////////////////////////////////////////////////////
 
+// Number of channels that are sent over serial
 #define NUM_INPUT_CHANNELS 4
-// Pin for PPM input. Must be either pin 1 or pin 2, because those are the only
-// pins that support interrupts.
-#define PPM_INPUT 2
-
-// If no serial signal is received in this many milliseconds, then switch to manual control
-#define SERIAL_TIMEOUT 500
-
-// Total width of one PPM frame, in microseconds. This was determined by the receiver.
-#define FRAME_WIDTH 20000
-// Pin on which to output a PPM signal
-#define PPM_OUTPUT 8
 
 #define SERIAL_BAUD_RATE 115200
 
@@ -30,17 +22,46 @@
 #define NUM_SONAR_SENSORS 2
 // Indexes of the sonar sensors
 const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {8, 9};
+
+////////////////
+///// PINS /////
+////////////////
+
+// Pin for PPM input. Must be either pin 1 or pin 2, because those are the only
+// pins that support interrupts.
+#define PPM_INPUT 2
+// Pin on which to output a PPM signal
+#define PPM_OUTPUT 8
+
+//Trigger - used to send signal out from sensor
+//Echo - used to recieve signal bounced back from obstacle
+const int triggerPin1 = 13;
+const int echoPin1 = 3; //interrupt pin
+
+//Values used for second sonar sensor
+const int triggerPin2 = 11;
+const int echoPin2 = 10;
+
 // Pins of the sonar sensors
 const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12};
-// When the last sonar echo pulse started
-volatile unsigned long sonarPulseStart = 0;
-// When the last sonar echo pulse ended
-volatile unsigned long sonarPulseEnd = 0;
-// Pin to connect all of the sonar inputs to
-// TODO: This doesn't actually work
-#define SONAR_ECHO_INPUT 3
-// Index of the current sonar senor that is waiting for a pulse
-volatile int currentSonarSensor = 0;
+
+// Pins for serial connection to flight controller
+#define FLIGHT_CONTROLLER_TX 6
+#define FLIGHT_CONTROLLER_RX 7
+
+///////////////////////////////
+///// Misc. Configuration /////
+///////////////////////////////
+
+// There are only 6 usable channels, but for some reason, the receiver outputs 8 PPM
+// channels, where the last 2 just never change.
+#define NUM_CHANNELS 8
+
+// If no serial signal is received in this many milliseconds, then switch to manual control
+#define SERIAL_TIMEOUT 500
+
+// Total width of one PPM frame, in microseconds. This was determined by the receiver.
+#define FRAME_WIDTH 20000
 
 // Speed of sound in centimeters per microsecond
 #define SPEED_OF_SOUND 0.0343
@@ -60,14 +81,17 @@ volatile int currentSonarSensor = 0;
 // This is the channel for the manual control switch
 #define MANUAL_CONTROL_CH 5
 
-//Trigger - used to send signal out from sensor
-//Echo - used to recieve signal bounced back from obstacle
-const int triggerPin1 = 13;
-const int echoPin1 = 3; //interrupt pin
+//////////////////////////////////
+///// Misc. Global Variables /////
+//////////////////////////////////
 
-//Values used for second sonar sensor
-const int triggerPin2 = 11;
-const int echoPin2 = 10;
+// When the last sonar echo pulse started
+volatile unsigned long sonarPulseStart = 0;
+// When the last sonar echo pulse ended
+volatile unsigned long sonarPulseEnd = 0;
+
+// Index of the current sonar senor that is waiting for a pulse
+volatile int currentSonarSensor = 0;
 
 //Duration - used to time how long the signal lasts once bounced back
 //Distance - used to store distance value calculated using duration
@@ -88,6 +112,9 @@ unsigned long lastSerialReceived = 0;
 volatile bool serialDisconnected = true;
 volatile bool manualSwitch = false;
 
+SoftwareSerial softSerial(FLIGHT_CONTROLLER_RX, FLIGHT_CONTROLLER_TX);
+LibrePilotSerial lps(&softSerial);
+
 void setup() {
     
     //Added pin mappings for sonar sensors
@@ -97,7 +124,7 @@ void setup() {
     pinMode(echoPin2, INPUT);
     //Attach sonarISR to interrupt to activate second sonar sensor once
     //first sensor has finished detection
-    attachInterrupt(digitalPinToInterrupt(echoPin1), sonarISR, FALLING);
+    //attachInterrupt(digitalPinToInterrupt(echoPin1), sonarISR, FALLING);
   
     pinMode(PPM_INPUT, INPUT);
     attachInterrupt(digitalPinToInterrupt(PPM_INPUT), ppmInterrupt, RISING);
@@ -107,14 +134,30 @@ void setup() {
         ppmOutput[i] = 1500;
     }
     pinMode(PPM_OUTPUT, OUTPUT);
-    Timer1.initialize(1000);
-    Timer1.attachInterrupt(&ppmOutputInterrupt, 1000);
+
+    // Because we're dealing with interrupts, we need to temporarily disable all of them
+    noInterrupts();
+    // See page 203 of http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-42735-8-bit-AVR-Microcontroller-ATmega328-328P_Datasheet.pdf
+    // for a comprehensive description of what all of this nonsense is.
+    // Set Timer2 to CTC (Clear Timer on Compare Match) mode
+    TCCR2A = 0b00000010;
+    // Set Timer2 divider to 8. This makes each tick 0.5 microseconds. (There's no divider of 16)
+    TCCR2B = 0b00000010;
+    // This isn't strictly necessary, but it sets the Timer2 counter to 0. (It will immediately resume incrementing,
+    // because that's what timers do)
+    TCNT2 = 0;
+    // Set the output compare to 255, for no apparent reason.
+    OCR2A = 0xFF;
+    // Enable to Output Compare A interrupt
+    TIMSK2 = 0b00000010;
+    // Done configuring Timer2, so resume all interrupts.
+    interrupts();
 
     for(int i = 0; i < NUM_SONAR_SENSORS; i++){
         pinMode(SONAR_SENSOR_PINS[i], OUTPUT);
     }
 
-    pinMode(SONAR_ECHO_INPUT, INPUT);
+    lps.serial->begin(57600);
 }
 
 volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
@@ -122,23 +165,23 @@ volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
 uint16_t sensorBuffer[NUM_SENSORS] = {0};
 
 void loop() {
-    if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
-        lastSerialReceived = millis();
-        serialDisconnected = false;
-        for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
-            serialInput[i] = Serial.read() << 8 | Serial.read();
-            ppmOutput[i] = serialInput[i];
-            //Serial.print(serialInput[i]);
-            //Serial.print(", ");
-        }
-        Serial.write(reinterpret_cast<uint8_t*>(sensorBuffer), NUM_SENSORS * 2);
-    }else if(millis() - lastSerialReceived > SERIAL_TIMEOUT){
-        serialDisconnected = true;
-        serialInput[THROTTLE_CH] = 1000;
-        serialInput[ROLL_CH] = 1500;
-        serialInput[YAW_CH] = 1500;
-        serialInput[PITCH_CH] = 1500;
-    }
+//    if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
+//        lastSerialReceived = millis();
+//        serialDisconnected = false;
+//        for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
+//            serialInput[i] = Serial.read() << 8 | Serial.read();
+//            ppmOutput[i] = serialInput[i];
+//            //Serial.print(serialInput[i]);
+//            //Serial.print(", ");
+//        }
+//        Serial.write(reinterpret_cast<uint8_t*>(sensorBuffer), NUM_SENSORS * 2);
+//    }else if(millis() - lastSerialReceived > SERIAL_TIMEOUT){
+//        serialDisconnected = true;
+//        serialInput[THROTTLE_CH] = 1000;
+//        serialInput[ROLL_CH] = 1500;
+//        serialInput[YAW_CH] = 1500;
+//        serialInput[PITCH_CH] = 1500;
+//    }
 
     sensorBuffer[ROLL_CH] = (uint16_t) ppmInput[ROLL_CH];
     sensorBuffer[PITCH_CH] = (uint16_t) ppmInput[PITCH_CH];
@@ -148,6 +191,18 @@ void loop() {
     sensorBuffer[MANUAL_CONTROL_CH] = (uint16_t) ppmInput[MANUAL_CONTROL_CH];
 
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
+
+    Serial.print(millis());
+    Serial.println(" Still running...");
+    delay(500);
+
+//    lps.request(ATTITUDESTATE_OBJID);
+//    boolean ok = lps.receive(ATTITUDESTATE_OBJID, AttitudeStateDataUnion.arr, 200);
+//    if(ok){
+//        Serial.println(AttitudeStateDataUnion.data.Yaw);
+//    }else{
+//        Serial.println("Not OK!!!");
+//    }
     
 //    //Begin code to poll first sonar sensor
 //    //Writes an initial LOW value to pin to ensure it is not high
@@ -173,7 +228,7 @@ void loop() {
 }
 
 
-
+// Input on PPM input
 void ppmInterrupt(){
     static int currentChannel = 0;
     static unsigned long lastPulseStart = 0;
@@ -193,26 +248,50 @@ void ppmInterrupt(){
     }
 }
 
-void ppmOutputInterrupt(){
-    static int currentOutputChannel = 0;
-    static unsigned int timeElapsed;
-    
-    digitalWrite(PPM_OUTPUT, HIGH);
-    digitalWrite(PPM_OUTPUT, LOW);
-    currentOutputChannel++;
-    static unsigned int period = 0;
-    if(currentOutputChannel == NUM_CHANNELS){
-        period = FRAME_WIDTH - timeElapsed;
-        timeElapsed = 0;
-        currentOutputChannel = -1;
-    }else if(serialDisconnected || manualSwitch){
-        period = ppmInput[currentOutputChannel];
-        timeElapsed += period;
-    }else{
-        period = ppmOutput[currentOutputChannel];
-        timeElapsed += period;
+// Interrupt for PPM output. This gets triggered whenever TCNT2 == OCR2A
+// (Timer2 counter == Output compare register 2A)
+ISR(TIMER2_COMPA_vect){
+    // Total number of microseconds elapsed for this frame
+    static uint32_t frameTimeElapsed = 0;
+    // Number of clock ticks left for the current pulse
+    static uint16_t pulseTicksLeft = 0;
+    // Channel number of the current pulse
+    static uint8_t currentChannel = 0;
+
+    // Here's how this works: The timer is only 8 bits, which is only 128 microseconds (us).
+    // But PPM pulses are up to 2000us apart. One option would be to increase the timer prescaler,
+    // so each tick is multiple microseconds, but this would decrease resolution. So, I just keep
+    // track of how many ticks have elapsed for the current pulse, and just keep setting the
+    // output compare register (OCR) to 255, until I have less than 255 ticks left.
+
+    if(!pulseTicksLeft){ // This means that the current pulse is finished.
+        currentChannel++;
+        // Entering the "Dead space" between frames
+        if(currentChannel >= NUM_CHANNELS){
+            currentChannel = -1;
+            pulseTicksLeft = (FRAME_WIDTH - frameTimeElapsed);
+            frameTimeElapsed = 0;
+        }else if (serialDisconnected || manualSwitch){ // Something is wrong, so enter manual control mode
+            pulseTicksLeft = ppmInput[currentChannel];
+            frameTimeElapsed += pulseTicksLeft;
+        }else{
+            pulseTicksLeft = ppmOutput[currentChannel];
+            frameTimeElapsed += pulseTicksLeft;
+        }
+        // Double the number of ticks, because one tick = 0.5 microseconds
+        pulseTicksLeft <<= 1;
+        // One quick pulse
+        digitalWrite(PPM_OUTPUT, HIGH);
+        digitalWrite(PPM_OUTPUT, LOW);
     }
-    Timer1.setPeriod(period);
+
+    if(pulseTicksLeft <= 255){
+        OCR2A = pulseTicksLeft;
+        pulseTicksLeft = 0;
+    }else{
+        OCR2A = 255;
+        pulseTicksLeft -= 255;
+    }
 }
 
 void sonarISR(){

@@ -20,7 +20,7 @@ SERIAL_PORT = "/dev/tty.usbmodem1421"
 ########################################################
 # Baud rate for communicating with the arduino.
 SERIAL_BAUD_RATE = 115200
-# Number of PPM channels for controlling the drone. Make sr
+# Number of PPM channels for controlling the drone.
 PPM_CHANNELS = 4
 THROTTLE_CHANNEL = 2
 ROLL_CHANNEL = 0
