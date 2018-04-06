@@ -33,7 +33,7 @@ const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {8, 9};
 // pins that support interrupts.
 #define PPM_INPUT 2
 // Pin on which to output a PPM signal
-#define PPM_OUTPUT 7
+#define PPM_OUTPUT 4
 
 //Trigger - used to send signal out from sensor
 //Echo - used to recieve signal bounced back from obstacle
@@ -46,11 +46,6 @@ const int echoPin2 = 10;
 
 // Pins of the sonar sensors
 const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12};
-
-// Pins for serial connection to flight controller
-// Note: If using the AltSoftSerial library, these are set in stone
-#define FLIGHT_CONTROLLER_TX 9
-#define FLIGHT_CONTROLLER_RX 8
 
 ///////////////////////////////
 ///// Misc. Configuration /////
@@ -115,9 +110,6 @@ unsigned long lastSerialReceived = 0;
 volatile bool serialDisconnected = true;
 volatile bool manualSwitch = false;
 
-AltSoftSerial softSerial;
-LibrePilotSerial lps((Stream*) &softSerial);
-
 void setup() {
     
     //Added pin mappings for sonar sensors
@@ -159,8 +151,6 @@ void setup() {
     for(int i = 0; i < NUM_SONAR_SENSORS; i++){
         pinMode(SONAR_SENSOR_PINS[i], OUTPUT);
     }
-
-    softSerial.begin(57600);
 }
 
 volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
@@ -168,23 +158,23 @@ volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
 uint16_t sensorBuffer[NUM_SENSORS] = {0};
 
 void loop() {
-//    if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
-//        lastSerialReceived = millis();
-//        serialDisconnected = false;
-//        for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
-//            serialInput[i] = Serial.read() << 8 | Serial.read();
-//            ppmOutput[i] = serialInput[i];
-//            //Serial.print(serialInput[i]);
-//            //Serial.print(", ");
-//        }
-//        Serial.write(reinterpret_cast<uint8_t*>(sensorBuffer), NUM_SENSORS * 2);
-//    }else if(millis() - lastSerialReceived > SERIAL_TIMEOUT){
-//        serialDisconnected = true;
-//        serialInput[THROTTLE_CH] = 1000;
-//        serialInput[ROLL_CH] = 1500;
-//        serialInput[YAW_CH] = 1500;
-//        serialInput[PITCH_CH] = 1500;
-//    }
+    if(Serial.available() >= NUM_INPUT_CHANNELS * 2){
+        lastSerialReceived = millis();
+        serialDisconnected = false;
+        for(int i = 0; i < NUM_INPUT_CHANNELS; i++){
+            serialInput[i] = Serial.read() << 8 | Serial.read();
+            ppmOutput[i] = serialInput[i];
+            //Serial.print(serialInput[i]);
+            //Serial.print(", ");
+        }
+        Serial.write(reinterpret_cast<uint8_t*>(sensorBuffer), NUM_SENSORS * 2);
+    }else if(millis() - lastSerialReceived > SERIAL_TIMEOUT){
+        serialDisconnected = true;
+        serialInput[THROTTLE_CH] = 1000;
+        serialInput[ROLL_CH] = 1500;
+        serialInput[YAW_CH] = 1500;
+        serialInput[PITCH_CH] = 1500;
+    }
 
     sensorBuffer[ROLL_CH] = (uint16_t) ppmInput[ROLL_CH];
     sensorBuffer[PITCH_CH] = (uint16_t) ppmInput[PITCH_CH];
@@ -195,11 +185,17 @@ void loop() {
 
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
 
-    Serial.print(millis());
-    Serial.print(" ");
-    Serial.println(" Still running...");
+    for(int i = 0; i < 5; i++){
+        Serial.print(ppmInput[i]);
+        Serial.print(", ");
+    }
+    Serial.println("");
 
-    delay(500);
+//    Serial.print(millis());
+//    Serial.print(" ");
+//    Serial.println(" Still running...");
+//
+//    delay(500);
     
 //    //Begin code to poll first sonar sensor
 //    //Writes an initial LOW value to pin to ensure it is not high
