@@ -96,7 +96,7 @@ void setup() {
   pinMode(echoPin2, INPUT);
   //Attach sonarISR to interrupt to activate second sonar sensor once
   //first sensor has finished detection
-  attachInterrupt(digitalPinToInterrupt(echoPin1), sonarISR, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(echoPin1), sonarISR, FALLING);
   
     pinMode(PPM_INPUT, INPUT);
     attachInterrupt(digitalPinToInterrupt(PPM_INPUT), ppmInterrupt, RISING);
@@ -185,6 +185,21 @@ void loop() {
     //Debug print statements
     //Serial.print("Distance(1): ");
     //Serial.println(distance1);
+
+    //Begin code to poll second sonar sensor 
+    digitalWrite(triggerPin2, LOW);
+    delayMicroseconds(2);
+
+    //write high to send out pulse
+    digitalWrite(triggerPin2, HIGH);
+    //keep sending pulse for 10 micro
+    delayMicroseconds(10);
+    //stop sending pulse by bringing pin LOW
+    digitalWrite(triggerPin2, LOW);
+
+    duration2 = pulseIn(echoPin2, HIGH);
+    //.000343 - meters, .0343 - cm, .343 - mm
+    distance2 = duration2*.343/2;
 }
 
 volatile int currentChannel = 0;
@@ -231,7 +246,7 @@ void sonarInputInterrupt(){
     }
 }
 
-void sonarISR(){
+/*void sonarISR(){
   //ISR is called any time the echo pin of the first sonar is changed from HIGH to LOW
   //which means the first sensor has completed its reading
   digitalWrite(triggerPin2, LOW);
@@ -251,5 +266,5 @@ void sonarISR(){
   //Debug print statements
   //Serial.print("Distance(2): ");
   //Serial.println(distance2);
-}
+}*/
 
