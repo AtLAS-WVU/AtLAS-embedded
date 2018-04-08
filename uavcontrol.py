@@ -3,7 +3,7 @@ import threading
 import time
 from config import SERIAL_BAUD_RATE, SERIAL_PORT, THROTTLE_CHANNEL, PITCH_CHANNEL, YAW_CHANNEL, ROLL_CHANNEL, \
     AUX_CHANNEL, MANUAL_CONTROL_CH, UAV_CONTROL_UPDATE_PERIOD, NUM_SENSORS, LEDDAR_SENSOR_NUM, SONAR_SENSOR_NUMS, \
-    COMPASS_SENSOR_NUM
+    COMPASS_SENSOR_NUM, YAW_SENSOR_NUM, PITCH_SENSOR_NUM, ROLL_SENSOR_NUM
 
 
 MIN_DIR = 1000
@@ -144,8 +144,45 @@ def get_compass_sensor():
     Get the most recent reading from the compass
     :return: Compass bearing, in degrees
     """
-    # TODO: Convert to degrees
-    return convert_bytes_to_int(__thread.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
+    bearing = convert_bytes_to_int(__thread.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
+    bearing /= 10
+    return bearing
+
+
+def get_yaw_sensor():
+    """
+    Get the most recent reading from the compass
+    :return: Compass bearing, in degrees
+    """
+    yaw = convert_bytes_to_int(__thread.sensor_buffer[YAW_SENSOR_NUM * 2:YAW_SENSOR_NUM * 2 + 2])
+    yaw /= 10
+    if yaw > 180:
+        yaw -= 360
+    return yaw
+
+
+def get_pitch_sensor():
+    """
+    Get the most recent reading from the compass
+    :return: Compass bearing, in degrees
+    """
+    pitch = convert_bytes_to_int(__thread.sensor_buffer[PITCH_SENSOR_NUM * 2:PITCH_SENSOR_NUM * 2 + 2])
+    pitch /= 10
+    if pitch > 180:
+        pitch -= 360
+    return pitch
+
+
+def get_roll_sensor():
+    """
+    Get the most recent reading from the compass
+    :return: Compass bearing, in degrees
+    """
+    roll = convert_bytes_to_int(__thread.sensor_buffer[ROLL_SENSOR_NUM * 2:ROLL_SENSOR_NUM * 2 + 2])
+    roll /= 10
+    if roll > 180:
+        roll -= 360
+    return roll
 
 
 def __constrain(val, min_=-1, max_=1):
@@ -201,3 +238,11 @@ def is_manual_mode():
     :return: A boolean. True if the remote control is set to manually control the drone.
     """
     return convert_bytes_to_int(__thread.sensor_buffer[MANUAL_CONTROL_CH * 2:MANUAL_CONTROL_CH * 2 + 2]) > 1500
+
+
+def _test():
+    while True:
+        print("Yaw: {:.1f}, Pitch: {:.1f}, Roll: {:.1f}, Compass: {:.1f}".format(get_yaw_sensor(), get_pitch_sensor(),
+                                                                                 get_roll_sensor(),
+                                                                                 get_compass_sensor()))
+        time.sleep(0.1)

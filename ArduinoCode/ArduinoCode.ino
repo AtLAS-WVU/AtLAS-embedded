@@ -1,8 +1,9 @@
-#include <AltSoftSerial.h>
-#include "LibrePilotSerial.h"
-#include "attitudestate.h"
-#include "magsensor.h"
-#include "flightstatus.h"
+#include <MadgwickAHRS.h>
+#include <MahonyAHRS.h>
+
+#include <MPU9250.h>
+#include <Wire.h>
+#include <math.h>
 
 //////////////////////////////////////////////////////////////
 ///// The following values must match those in config.py /////
@@ -14,16 +15,20 @@
 #define SERIAL_BAUD_RATE 115200
 
 // Total number of sensors on the drone, including remote control inputs
-#define NUM_SENSORS 10
+#define NUM_SENSORS 13
 
 // Index of the Leddar sensor
 #define LEDDAR_SENSOR_NUM 6
 
-#define COMPASS_SENSOR_NUM 7
+#define COMPASS_SENSOR_NUM 9
 // How many sonar sensors
 #define NUM_SONAR_SENSORS 2
 // Indexes of the sonar sensors
-const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {8, 9};
+const int SONAR_SENSOR_NUMS[NUM_SONAR_SENSORS] = {7, 8};
+
+#define YAW_SENSOR_NUM 10
+#define PITCH_SENSOR_NUM 11
+#define ROLL_SENSOR_NUM 12
 
 ////////////////
 ///// PINS /////
@@ -47,6 +52,18 @@ const int echoPin2 = 10;
 // Pins of the sonar sensors
 const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12};
 
+// Channels of remote controller inputs and outputs
+// Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
+// GCS software use 1-based index. Therefore, channel 0 here corresponds to channel 1 of the
+// remote control and GCS, and so on.
+#define THROTTLE_CH 2
+#define ROLL_CH 0
+#define PITCH_CH 1
+#define YAW_CH 3
+#define AUX_CH 4
+// This is the channel for the manual control switch
+#define MANUAL_CONTROL_CH 5
+
 ///////////////////////////////
 ///// Misc. Configuration /////
 ///////////////////////////////
@@ -67,17 +84,8 @@ const int SONAR_SENSOR_PINS[NUM_SONAR_SENSORS] = {13, 12};
 // For sonar sensors
 #define MAX_PULSE_DURATION 30000
 
-// Channels of remote controller inputs and outputs
-// Note: This program uses 0-based indexing, but the remote control, and the LibrePilot
-// GCS software use 1-based index. Therefore, channel 0 here corresponds to channel 1 of the
-// remote control and GCS, and so on.
-#define THROTTLE_CH 2
-#define ROLL_CH 0
-#define PITCH_CH 1
-#define YAW_CH 3
-#define AUX_CH 4
-// This is the channel for the manual control switch
-#define MANUAL_CONTROL_CH 5
+// Period of IMU updates, in milliseconds
+#define IMU_UPDATE_PERIOD 10
 
 //////////////////////////////////
 ///// Misc. Global Variables /////
@@ -109,6 +117,16 @@ unsigned long lastSerialReceived = 0;
 // True if it's been more than SERIAL_TIMEOUT milliseconds since the last serial input
 volatile bool serialDisconnected = true;
 volatile bool manualSwitch = false;
+
+float mag_offset[3] = {31.98f, -16.74f, -0.13f};
+float mag_softiron_matrix[3][3] = {
+    {1.012f, -0.007f, -0.008f},
+    {-0.007f, 0.969f, 0.009f},
+    {-0.008f, -0.009f, 1.020f}
+};
+
+MPU9250 imu(Wire, 0x68);
+Mahony filter;
 
 void setup() {
     
@@ -151,6 +169,13 @@ void setup() {
     for(int i = 0; i < NUM_SONAR_SENSORS; i++){
         pinMode(SONAR_SENSOR_PINS[i], OUTPUT);
     }
+
+    Wire.begin();
+    imu.begin();
+    imu.setMagCalX(-20.01, 0.99);
+    imu.setMagCalY(20.73, 1.02);
+    imu.setMagCalZ(-4.20, 0.99);
+    filter.begin(1000 / IMU_UPDATE_PERIOD);
 }
 
 volatile unsigned int serialInput[NUM_INPUT_CHANNELS] = {0};
@@ -185,11 +210,7 @@ void loop() {
 
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
 
-    for(int i = 0; i < 5; i++){
-        Serial.print(ppmInput[i]);
-        Serial.print(", ");
-    }
-    Serial.println("");
+    updateIMU();
 
 //    Serial.print(millis());
 //    Serial.print(" ");
@@ -218,6 +239,47 @@ void loop() {
 //    //Debug print statements
 //    //Serial.print("Distance(1): ");
 //    //Serial.println(distance1);
+}
+
+const float radToDeg = 180.0f / PI;
+
+void updateIMU(){
+    static long lastUpdate = 0;
+
+    if(millis() - lastUpdate > IMU_UPDATE_PERIOD){
+        lastUpdate = millis();
+        imu.readSensor();
+    
+        float ax, ay, az, gx, gy, gz, x, y, z, mx, my, mz, heading, yaw, pitch, roll;
+        ax = imu.getAccelX_mss();
+        ay = imu.getAccelY_mss();
+        az = imu.getAccelZ_mss();
+        gx = imu.getGyroX_rads() * radToDeg;
+        gy = imu.getGyroY_rads() * radToDeg;
+        gz = imu.getGyroZ_rads() * radToDeg;
+        x = imu.getMagX_uT() - mag_offset[0];
+        y = imu.getMagY_uT() - mag_offset[1];
+        z = imu.getMagZ_uT() - mag_offset[2];
+        mx = x * mag_softiron_matrix[0][0] + y * mag_softiron_matrix[0][1] + z * mag_softiron_matrix[0][2];
+        my = x * mag_softiron_matrix[1][0] + y * mag_softiron_matrix[1][1] + z * mag_softiron_matrix[1][2];
+        mz = x * mag_softiron_matrix[2][0] + y * mag_softiron_matrix[2][1] + z * mag_softiron_matrix[2][2];
+        
+        filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
+    
+        heading = atan2(my, mx) * radToDeg;
+        heading = heading < 0 ? heading + 360.0f : heading;
+        yaw = filter.getYaw();
+        yaw = yaw < 0 ? yaw + 360.0f : yaw;
+        pitch = filter.getPitch();
+        pitch = pitch < 0 ? pitch + 360.0f : pitch;
+        roll = filter.getRoll();
+        roll = roll < 0 ? roll + 360.0f : roll;
+    
+        sensorBuffer[YAW_SENSOR_NUM] = (uint16_t)(yaw * 10);
+        sensorBuffer[PITCH_SENSOR_NUM] = (uint16_t)(pitch * 10);
+        sensorBuffer[ROLL_SENSOR_NUM] = (uint16_t)(roll * 10);
+        sensorBuffer[COMPASS_SENSOR_NUM] = (uint16_t)(heading * 10);
+    }
 }
 
 
