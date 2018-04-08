@@ -11,6 +11,8 @@ RASPBERRY_PI = False
 # How often should control signals be sent to the flight controller, in seconds
 UAV_CONTROL_UPDATE_PERIOD = 0.01
 
+# Number of elements to take a rolling average of for the compass sensor
+COMPASS_SENSOR_ROLLING_AVERAGE = 0.5 / UAV_CONTROL_UPDATE_PERIOD
 
 # Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty.*'
 SERIAL_PORT = "/dev/ttyS0"

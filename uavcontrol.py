@@ -1,14 +1,28 @@
 import serial
 import threading
 import time
+from collections import deque
 from config import SERIAL_BAUD_RATE, SERIAL_PORT, THROTTLE_CHANNEL, PITCH_CHANNEL, YAW_CHANNEL, ROLL_CHANNEL, \
     AUX_CHANNEL, MANUAL_CONTROL_CH, UAV_CONTROL_UPDATE_PERIOD, NUM_SENSORS, LEDDAR_SENSOR_NUM, SONAR_SENSOR_NUMS, \
-    COMPASS_SENSOR_NUM, YAW_SENSOR_NUM, PITCH_SENSOR_NUM, ROLL_SENSOR_NUM
+    COMPASS_SENSOR_NUM, YAW_SENSOR_NUM, PITCH_SENSOR_NUM, ROLL_SENSOR_NUM, COMPASS_SENSOR_ROLLING_AVERAGE
 
 
 MIN_DIR = 1000
 MAX_DIR = 2000
 DEFAULT_DIR = (MAX_DIR-MIN_DIR)/2 + MIN_DIR
+
+
+def convert_bytes_to_int(bytes_):
+    """
+    Converts a byte string to a single unsigned integer
+    :param bytes_: A little-endian byte string
+    :return: A positive integer
+    """
+    result = 0
+    for byte in reversed(bytes_):
+        result <<= 8
+        result += byte
+    return result
 
 
 class __UavControlThread(threading.Thread):
@@ -22,6 +36,7 @@ class __UavControlThread(threading.Thread):
         self.serial_port = serial.Serial(SERIAL_PORT, baudrate=SERIAL_BAUD_RATE, timeout=0.05, write_timeout=0.1)
         self.running = True
         self.sensor_buffer = None
+        self.compass_queue = deque()
 
     def run(self):
         while self.running:
@@ -45,6 +60,11 @@ class __UavControlThread(threading.Thread):
         # print("Reading sensors...")
         # print("Num bytes available: {}".format(self.serial_port.in_waiting))
         self.sensor_buffer = self.serial_port.read(NUM_SENSORS * 2)
+        bearing = convert_bytes_to_int(self.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
+        bearing /= 10
+        self.compass_queue.append(bearing)
+        if len(self.compass_queue) > COMPASS_SENSOR_ROLLING_AVERAGE:
+            self.compass_queue.popleft()
 
 
 __thread = __UavControlThread()
@@ -53,19 +73,6 @@ __thread.start()
 # Wait for the thread to make initial connection with the arduino.
 while __thread.sensor_buffer is None:
     time.sleep(0.01)
-
-
-def convert_bytes_to_int(bytes_):
-    """
-    Converts a byte string to a single unsigned integer
-    :param bytes_: A little-endian byte string
-    :return: A positive integer
-    """
-    result = 0
-    for byte in reversed(bytes_):
-        result <<= 8
-        result += byte
-    return result
 
 
 def set_throttle(throttle):
@@ -135,14 +142,17 @@ def get_sonar_sensors():
             for sensor_num in SONAR_SENSOR_NUMS]
 
 
-def get_compass_sensor():
+def get_compass_sensor(average=True):
     """
     Get the most recent reading from the compass
     :return: Compass bearing, in degrees
     """
-    bearing = convert_bytes_to_int(__thread.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
-    bearing /= 10
-    return bearing
+    if not average:
+        bearing = convert_bytes_to_int(__thread.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
+        bearing /= 10
+        return bearing
+    else:
+        return sum(__thread.compass_queue) / len(__thread.compass_queue)
 
 
 def get_yaw_sensor():

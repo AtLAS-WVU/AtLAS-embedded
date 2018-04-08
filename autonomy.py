@@ -8,7 +8,7 @@ from GPSWrapper import thread as gps
 from config import UAV_CONTROL_UPDATE_PERIOD
 
 
-def constrain(val, min_=-1, max_=1):
+def constrain(val, min_=-1.0, max_=1.0):
     return max(min([val, max_]), min_)
 
 
@@ -19,8 +19,10 @@ class __AutonomyThread(threading.Thread):
         self.running = True
         self.target_lat = 39
         self.target_lon = 70
-        self.pid_left = Pid(1, 0.5, 0.5, max_integral=1)
-        self.pid_forward = Pid(1, 1, 1, max_integral=1)
+        self.target_yaw = 0
+        self.pid_left = Pid(0.1, 0.05, 0.05, max_integral=1)
+        self.pid_forward = Pid(0.1, 0.05, 0.05, max_integral=1)
+        self.pid_yaw = Pid(0.01, 0.005, 0.005, max_integral=1)
         self.aux_switch_was_flipped = False
         self.last_debug_print = time.time()
 
@@ -45,19 +47,21 @@ class __AutonomyThread(threading.Thread):
 
         return left_error, forward_error
 
-    def reset_target(self, lat, lon):
+    def reset_target(self, lat, lon, yaw):
         self.target_lat = lat
         self.target_lon = lon
+        self.target_yaw = yaw
         self.pid_forward.reset()
         self.pid_left.reset()
+        self.pid_yaw.reset()
 
     def run(self):
-        self.reset_target(gps.latitude, gps.longitude)
+        self.reset_target(gps.latitude, gps.longitude, uavcontrol.get_compass_sensor())
         while self.running:
             if uavcontrol.get_aux_input() and not self.aux_switch_was_flipped:
                 self.aux_switch_was_flipped = True
                 print("AUX SWITCH FLIPPED")
-                self.reset_target(gps.latitude, gps.longitude)
+                self.reset_target(gps.latitude, gps.longitude, uavcontrol.get_compass_sensor())
             elif not uavcontrol.get_aux_input():
                 self.aux_switch_was_flipped = False
             # Set throttle manually from remote control
@@ -65,18 +69,31 @@ class __AutonomyThread(threading.Thread):
             uavcontrol.set_throttle(throttle)
 
             left_error, forward_error = self.calc_error()
+            yaw_error = uavcontrol.get_compass_sensor() - self.target_yaw
 
             left_correction = self.pid_left.update(left_error)
             forward_correction = self.pid_forward.update(forward_error)
+            yaw_correction = self.pid_yaw.update(yaw_error)
             if time.time() - self.last_debug_print > 0.5:
                 self.last_debug_print = time.time()
-                print("Err: (L: {:7.4f}, F: {:7.4f}), PID: (L: {:7.4f}, F: {:7.4f})".format(
-                    left_error, forward_error, left_correction, forward_correction)
+                print("Err: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f}), PID: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f})".format(
+                    left_error, forward_error, yaw_error, left_correction, forward_correction, yaw_correction)
                 )
+
+            left_correction = constrain(left_correction, min_=-0.3, max_=0.3)
+            forward_correction = constrain(forward_correction, min_=-0.3, max_=0.3)
+            yaw_correction = constrain(yaw_correction, min_=-0.3, max_=0.3)
+
+            uavcontrol.set_pitch(forward_correction)
+            uavcontrol.set_roll(left_correction)
+            uavcontrol.set_yaw_signal(yaw_correction)
 
             time.sleep(UAV_CONTROL_UPDATE_PERIOD)
 
 
 __thread = __AutonomyThread()
-# __thread.start()
-thread = __thread
+__thread.start()
+while True:
+    time.sleep(1)
+
+# thread = __thread
