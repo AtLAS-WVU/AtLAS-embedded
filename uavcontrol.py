@@ -19,7 +19,7 @@ class __UavControlThread(threading.Thread):
         self.pitch = 1500
         self.yaw = 1500
         self.roll = 1500
-        self.serial_port = serial.Serial(SERIAL_PORT, baudrate=SERIAL_BAUD_RATE, timeout=0.005, write_timeout=0.01)
+        self.serial_port = serial.Serial(SERIAL_PORT, baudrate=SERIAL_BAUD_RATE, timeout=0.05, write_timeout=0.1)
         self.running = True
         self.sensor_buffer = None
 
@@ -102,10 +102,6 @@ def set_yaw_signal(yaw):
     if yaw < -1 or yaw > 1:
         raise ValueError("yaw must be between -1 and 1, inclusive")
     __thread.yaw = int((yaw / 2 + 0.5) * (MAX_DIR - MIN_DIR) + MIN_DIR)
-
-
-def set_yaw_hold(yaw):
-    pass
 
 
 def set_roll(roll):

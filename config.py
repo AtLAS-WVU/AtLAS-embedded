@@ -13,7 +13,7 @@ UAV_CONTROL_UPDATE_PERIOD = 0.01
 
 
 # Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty.*'
-SERIAL_PORT = "/dev/tty.usbmodem1421"
+SERIAL_PORT = "/dev/ttyS0"
 
 ########################################################
 # MAKE SURE THESE MATCH THE VALUES IN THE ARDUINO CODE #

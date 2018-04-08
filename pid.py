@@ -3,7 +3,7 @@ import time
 
 class Pid:
 
-    def __init__(self, p, i, d, initial_val=0):
+    def __init__(self, p, i, d, initial_val=0, max_integral=None):
         """
 
         :param p: P constant
@@ -17,6 +17,7 @@ class Pid:
         self.prev_error = initial_val
         self.integral = 0
         self.prev_time = time.time()
+        self.max_integral = max_integral
 
     def update(self, error, delta_time=None, derivative=None):
         """
@@ -36,6 +37,9 @@ class Pid:
         self.prev_time = time.time()
         self.prev_error = error
         self.integral += (error * delta_time)
+        # Constrain self.integral between -max_integral and +max_integral
+        if self.max_integral is not None:
+            self.integral = min(max(self.integral, -self.max_integral), self.max_integral)
 
         return (self.p * error) + (self.i * self.integral) + (self.d * derivative)
 
