@@ -36,7 +36,8 @@ class __UavControlThread(threading.Thread):
         self.serial_port = serial.Serial(SERIAL_PORT, baudrate=SERIAL_BAUD_RATE, timeout=0.05, write_timeout=0.1)
         self.running = True
         self.sensor_buffer = None
-        self.compass_queue = deque()
+        self.compass_queue = deque([0])
+        self.compass_offset = 0
 
     def run(self):
         while self.running:
@@ -60,8 +61,14 @@ class __UavControlThread(threading.Thread):
         # print("Reading sensors...")
         # print("Num bytes available: {}".format(self.serial_port.in_waiting))
         self.sensor_buffer = self.serial_port.read(NUM_SENSORS * 2)
-        bearing = convert_bytes_to_int(self.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
-        bearing /= 10
+        bearing = convert_bytes_to_int(self.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2]) / 10.0
+        bearing += self.compass_offset
+        if bearing - self.compass_queue[-1] < -180:
+            bearing += 360
+            self.compass_offset += 360
+        elif bearing - self.compass_queue[-1] > 180:
+            bearing -= 360
+            self.compass_offset -= 360
         self.compass_queue.append(bearing)
         if len(self.compass_queue) > COMPASS_SENSOR_ROLLING_AVERAGE:
             self.compass_queue.popleft()
@@ -142,17 +149,24 @@ def get_sonar_sensors():
             for sensor_num in SONAR_SENSOR_NUMS]
 
 
-def get_compass_sensor(average=True):
+def get_compass_sensor(average=True, continuous=False):
     """
     Get the most recent reading from the compass
-    :return: Compass bearing, in degrees
+    :param average: If True, then the result will be the rolling average of the last N sensor readings,
+        where N is COMPASS_SENSOR_ROLLING_AVERAGE in config.py
+    :param continuous: If True, then the compass bearing will be offset such that it returns continuous readings
+        over time. That is, if the drone rotates 360 degrees to the left, the result will increase by 360, rather
+        than returning to the starting point. If continuous=False, then this reading is liable to jump discontinuously
+        between 0 and 359.9 degrees, as the drone rotates past north.
+    :return: Compass bearing, in degrees. North is 0 degrees, West is +90 degrees. Maximum precision of 0.1 degrees.
     """
     if not average:
-        bearing = convert_bytes_to_int(__thread.sensor_buffer[COMPASS_SENSOR_NUM * 2:COMPASS_SENSOR_NUM * 2 + 2])
-        bearing /= 10
-        return bearing
+        bearing = __thread.compass_queue[-1]
     else:
-        return sum(__thread.compass_queue) / len(__thread.compass_queue)
+        bearing = sum(__thread.compass_queue) / len(__thread.compass_queue)
+    if not continuous:
+        bearing %= 360.0
+    return bearing
 
 
 def get_yaw_sensor():
@@ -252,3 +266,8 @@ def _test():
                                                                                  get_roll_sensor(),
                                                                                  get_compass_sensor()))
         time.sleep(0.1)
+
+if __name__ == "__main__":
+    while True:
+        print("Heading: {}, Offset: {}".format(get_compass_sensor(), __thread.compass_offset))
+        time.sleep(0.2)

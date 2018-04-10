@@ -15,7 +15,7 @@ UAV_CONTROL_UPDATE_PERIOD = 0.01
 COMPASS_SENSOR_ROLLING_AVERAGE = 0.5 / UAV_CONTROL_UPDATE_PERIOD
 
 # Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty.*'
-SERIAL_PORT = "/dev/ttyS0"
+SERIAL_PORT = "/dev/ttyAMA0"
 
 ########################################################
 # MAKE SURE THESE MATCH THE VALUES IN THE ARDUINO CODE #
