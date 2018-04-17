@@ -31,7 +31,7 @@ try:
 		print("The result from sending data to server was: %s", response.text)
 		time.sleep(1)
 except (KeyboardInterrupt, SystemExit): 
-	print "\nKilling Thread..."
+	print("\nKilling Thread...")
 	gps.running = False
 	gps.join()
-print "Done."
+print("Done.")
