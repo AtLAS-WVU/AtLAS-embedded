@@ -22,7 +22,7 @@ class __AutonomyThread(threading.Thread):
         self.target_yaw = 0
         self.pid_left = Pid(0.1, 0, 0, max_integral=1)
         self.pid_forward = Pid(0.1, 0, 0, max_integral=1)
-        self.pid_yaw = Pid(0.01, 0, 0, max_integral=1)
+        self.pid_yaw = Pid(0.01, 0.005, 0, max_integral=1)
         self.prev_yaw_error = 0
         self.aux_switch_was_flipped = False
         self.last_debug_print = time.time()
@@ -43,7 +43,7 @@ class __AutonomyThread(threading.Thread):
         left_error = error_magnitude * math.sin(math.radians(bearing - error_angle))
         forward_error = error_magnitude * math.cos(math.radians(bearing - error_angle))
 
-        return -left_error, forward_error
+        return -left_error, -forward_error
 
     def reset_target(self, lat, lon, yaw):
         self.target_lat = lat
@@ -59,7 +59,8 @@ class __AutonomyThread(threading.Thread):
             if uavcontrol.get_aux_input() and not self.aux_switch_was_flipped:
                 self.aux_switch_was_flipped = True
                 print("AUX SWITCH FLIPPED")
-                self.reset_target(gps.latitude, gps.longitude, uavcontrol.get_compass_sensor())
+                self.reset_target(gps.latitude, gps.longitude,
+                                  uavcontrol.get_compass_sensor(average=True, continuous=True))
             elif not uavcontrol.get_aux_input():
                 self.aux_switch_was_flipped = False
             # Set throttle manually from remote control
@@ -68,7 +69,7 @@ class __AutonomyThread(threading.Thread):
             # print("set throttle to {}".format(throttle))
 
             left_error, forward_error = self.calc_error()
-            yaw_error = uavcontrol.get_compass_sensor(average=True, continuous=True) - self.target_yaw
+            yaw_error = uavcontrol.get_compass_sensor(average=False, continuous=True) - self.target_yaw
 
             left_correction = -self.pid_left.update(left_error)
             forward_correction = -self.pid_forward.update(forward_error)
@@ -76,7 +77,7 @@ class __AutonomyThread(threading.Thread):
 
             left_correction = constrain(left_correction, min_=-0.2, max_=0.2)
             forward_correction = constrain(forward_correction, min_=-0.2, max_=0.2)
-            yaw_correction = constrain(yaw_correction, min_=-0.2, max_=0.2)
+            yaw_correction = constrain(yaw_correction, min_=-0.8, max_=0.8)
 
             if time.time() - self.last_debug_print > 0.5:
                 self.last_debug_print = time.time()
@@ -84,17 +85,18 @@ class __AutonomyThread(threading.Thread):
                     left_error, forward_error, yaw_error, left_correction, forward_correction, yaw_correction)
                 )
 
-                print("Inputs: Pitch: {}, Yaw: {}, Roll: {}".format(
-                    uavcontrol.get_pitch_input(), uavcontrol.get_yaw_input(), uavcontrol.get_roll_input()
-                ))
+                # print("Inputs: Pitch: {}, Yaw: {}, Roll: {}".format(
+                #     uavcontrol.get_pitch_input(), uavcontrol.get_yaw_input(), uavcontrol.get_roll_input()
+                # ))
 
-            #uavcontrol.set_pitch(forward_correction)
+            uavcontrol.set_pitch(forward_correction)
             # Positive roll is right, so negate it to make it left
             uavcontrol.set_roll(-left_correction)
+            # uavcontrol.set_roll(uavcontrol.get_roll_input())
             # Positive yaw is right, so negate it to make it left
-            #uavcontrol.set_yaw_signal(-yaw_correction)
-            uavcontrol.set_pitch(uavcontrol.get_pitch_input())
-            uavcontrol.set_yaw_signal(uavcontrol.get_yaw_input())
+            uavcontrol.set_yaw_signal(-yaw_correction)
+            # uavcontrol.set_pitch(uavcontrol.get_pitch_input())
+            # uavcontrol.set_yaw_signal(uavcontrol.get_yaw_input())
 
             time.sleep(UAV_CONTROL_UPDATE_PERIOD)
 
