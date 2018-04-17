@@ -41,7 +41,7 @@ class Pid:
         if self.max_integral is not None:
             self.integral = min(max(self.integral, -self.max_integral), self.max_integral)
 
-        return (self.p * error) + (self.i * self.integral) + (self.d * derivative)
+        return - ((self.p * error) + (self.i * self.integral) + (self.d * derivative))
 
     def reset(self):
         """

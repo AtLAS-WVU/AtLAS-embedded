@@ -20,9 +20,9 @@ class __AutonomyThread(threading.Thread):
         self.target_lat = 39
         self.target_lon = 70
         self.target_yaw = 0
-        self.pid_left = Pid(0.1, 0, 0, max_integral=1)
-        self.pid_forward = Pid(0.1, 0, 0, max_integral=1)
-        self.pid_yaw = Pid(0.01, 0.005, 0, max_integral=1)
+        self.pid_left = Pid(0.2, 0.05, 0, max_integral=1)
+        self.pid_forward = Pid(0.2, 0.05, 0, max_integral=1)
+        self.pid_yaw = Pid(0.02, 0.005, 0, max_integral=1)
         self.prev_yaw_error = 0
         self.aux_switch_was_flipped = False
         self.last_debug_print = time.time()
@@ -71,9 +71,9 @@ class __AutonomyThread(threading.Thread):
             left_error, forward_error = self.calc_error()
             yaw_error = uavcontrol.get_compass_sensor(average=False, continuous=True) - self.target_yaw
 
-            left_correction = -self.pid_left.update(left_error)
-            forward_correction = -self.pid_forward.update(forward_error)
-            yaw_correction = -self.pid_yaw.update(yaw_error)
+            left_correction = self.pid_left.update(left_error)
+            forward_correction = self.pid_forward.update(forward_error)
+            yaw_correction = self.pid_yaw.update(yaw_error)
 
             left_correction = constrain(left_correction, min_=-0.2, max_=0.2)
             forward_correction = constrain(forward_correction, min_=-0.2, max_=0.2)
@@ -89,6 +89,7 @@ class __AutonomyThread(threading.Thread):
                 #     uavcontrol.get_pitch_input(), uavcontrol.get_yaw_input(), uavcontrol.get_roll_input()
                 # ))
 
+            # Positive pitch is forward, so this is all good
             uavcontrol.set_pitch(forward_correction)
             # Positive roll is right, so negate it to make it left
             uavcontrol.set_roll(-left_correction)
