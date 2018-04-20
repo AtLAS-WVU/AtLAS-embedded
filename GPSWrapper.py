@@ -24,6 +24,7 @@ class __GPSWrapper(threading.Thread):
         self.gpsd = GPS(mode=WATCH_ENABLE)
         self.current_value = None
         self.running = True
+        self.updated = False
 
     def run(self):
         self.waitForFix()
@@ -67,6 +68,7 @@ class __GPSWrapper(threading.Thread):
         self.mode = self.gpsd.fix.mode
         self.track = self.gpsd.fix.track
         self.climb = self.gpsd.fix.climb
+        self.updated = True
         return 1	 # Success
 
     # Function is called to calculate the distance between the current drone location and the destination

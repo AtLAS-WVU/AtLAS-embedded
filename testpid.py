@@ -21,7 +21,7 @@ def test_pid(mass=3, velocity=1, start_point=2, iterations=2000, time_step=0.01,
     def wind(time_step):
         result = 0
         for x, y in wind_f:
-            result += wind_force * (x - 0.5) * math.sin(y * 4 * time_step)
+            result += wind_force * (x - 0.5) * math.sin(y * 0.5 * time_step)
         return result
 
     for i in range(0, iterations):
