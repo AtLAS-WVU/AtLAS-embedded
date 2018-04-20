@@ -125,6 +125,16 @@ float mag_softiron_matrix[3][3] = {
     {-0.008f, -0.009f, 1.020f}
 };
 
+// Magnetic Declination is the "error" of the magnetic field at a given location.
+// In morgantown, the magnetic field points 9.16 degrees west of true North.
+// (Calculate it for other locations at https://www.ngdc.noaa.gov/geomag-web/#declination)
+#define MAG_DECLINATION -9.16f
+// Magnetic inclination is how far away from horizontal the magnetic field is.
+// The field does not run parallel to the ground. It actually points downward into the earth.
+// This is the angle it points downward.
+#define MAG_INCLINATION 66.66f
+// (Ironically, the magnetic inclination measures the decline of the magnetic field.)
+
 MPU9250 imu(Wire, 0x68);
 Mahony filter;
 
@@ -240,15 +250,29 @@ void updateIMU(){
         
         filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
     
+
+        yaw = filter.getYaw();
+        pitch = filter.getPitch();
+        roll = filter.getRoll();
+        
+
+        float sinphi = sin(roll);
+        float sintheta = sin(pitch);
+        float cosphi = cos(roll);
+        float costheta = cos(pitch);
+
+        // Magnetometer tilt compensation
+        // (Equations from https://cache.freescale.com/files/sensors/doc/app_note/AN4248.pdf)
+        float tmx, tmy, tmz;
+        tmx = (mx * costheta) + (my * sintheta * sinphi) + (mx * sintheta * cosphi);
+        tmy = (my * cosphi) - (mz * sinphi);
+        //tmz = (-mx * sintheta) + (my * costheta * sinphi) + (mz * costheta * cosphi);
         heading = atan2(my, mx) * radToDeg;
         heading = heading < 0 ? heading + 360.0f : heading;
-        yaw = filter.getYaw();
+
         yaw = yaw < 0 ? yaw + 360.0f : yaw;
-        pitch = filter.getPitch();
         pitch = pitch < 0 ? pitch + 360.0f : pitch;
-        roll = filter.getRoll();
         roll = roll < 0 ? roll + 360.0f : roll;
-    
         sensorBuffer[YAW_SENSOR_NUM] = (uint16_t)(yaw * 10);
         sensorBuffer[PITCH_SENSOR_NUM] = (uint16_t)(pitch * 10);
         sensorBuffer[ROLL_SENSOR_NUM] = (uint16_t)(roll * 10);
