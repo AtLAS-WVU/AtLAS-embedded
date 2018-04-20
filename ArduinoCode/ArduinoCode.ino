@@ -211,34 +211,8 @@ void loop() {
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
 
     updateIMU();
+    updateSonar();
 
-//    Serial.print(millis());
-//    Serial.print(" ");
-//    Serial.println(" Still running...");
-//
-//    delay(500);
-    
-//    //Begin code to poll first sonar sensor
-//    //Writes an initial LOW value to pin to ensure it is not high
-//    digitalWrite(triggerPin1, LOW);
-//    delayMicroseconds(2);
-//
-//    //Then a HIGH value is written to send initial signal
-//    //which is sent for 10 micro
-//    digitalWrite(triggerPin1, HIGH);
-//    delayMicroseconds(10);
-//    //Signal is then stopped by writing LOW to pin
-//    digitalWrite(triggerPin1, LOW);
-//
-//    //Then record how long pulse is detected once bounced back from obstacle
-//    //and records time as long as pin is pulled HIGH
-//    duration1 = pulseIn(echoPin1, HIGH);
-//    //.000343 - meters, .0343 - cm, .343 - mm
-//    distance1 = duration1*.343/2;
-//
-//    //Debug print statements
-//    //Serial.print("Distance(1): ");
-//    //Serial.println(distance1);
 }
 
 const float radToDeg = 180.0f / PI;
@@ -280,6 +254,41 @@ void updateIMU(){
         sensorBuffer[ROLL_SENSOR_NUM] = (uint16_t)(roll * 10);
         sensorBuffer[COMPASS_SENSOR_NUM] = (uint16_t)(heading * 10);
     }
+}
+
+void updateSonar(){
+    //Begin code to poll first sonar sensor
+    //Writes an initial LOW value to pin to ensure it is not high
+    digitalWrite(triggerPin1, LOW);
+    delayMicroseconds(2);
+
+    //Then a HIGH value is written to send initial signal
+    //which is sent for 10 micro
+    digitalWrite(triggerPin1, HIGH);
+    delayMicroseconds(10);
+    //Signal is then stopped by writing LOW to pin
+    digitalWrite(triggerPin1, LOW);
+
+    //Then record how long pulse is detected once bounced back from obstacle
+    //and records time as long as pin is pulled HIGH
+    duration1 = pulseIn(echoPin1, HIGH);
+    //.000343 - meters, .0343 - cm, .343 - mm
+    distance1 = duration1*.343/2;
+
+    //Begin code to poll second sonar sensor 
+    digitalWrite(triggerPin2, LOW);
+    delayMicroseconds(2);
+
+    //write high to send out pulse
+    digitalWrite(triggerPin2, HIGH);
+    //keep sending pulse for 10 micro
+    delayMicroseconds(10);
+    //stop sending pulse by bringing pin LOW
+    digitalWrite(triggerPin2, LOW);
+
+    duration2 = pulseIn(echoPin2, HIGH);
+    //.000343 - meters, .0343 - cm, .343 - mm
+    distance2 = duration2*.343/2;
 }
 
 
@@ -347,27 +356,5 @@ ISR(TIMER2_COMPA_vect){
         OCR2A = 255;
         pulseTicksLeft -= 255;
     }
-}
-
-void sonarISR(){
-  //ISR is called any time the echo pin of the first sonar is changed from HIGH to LOW
-  //which means the first sensor has completed its reading
-  digitalWrite(triggerPin2, LOW);
-  delayMicroseconds(2);
-
-  //write high to send out pulse
-  digitalWrite(triggerPin2, HIGH);
-  //keep sending pulse for 10 micro
-  delayMicroseconds(10);
-  //stop sending pulse by bringing pin LOW
-  digitalWrite(triggerPin2, LOW);
-
-  duration2 = pulseIn(echoPin2, HIGH);
-  //.000343 - meters, .0343 - cm, .343 - mm
-  distance2 = duration2*.343/2;
-
-  //Debug print statements
-  //Serial.print("Distance(2): ");
-  //Serial.println(distance2);
 }
 

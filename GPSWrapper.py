@@ -103,6 +103,21 @@ class __GPSWrapper(threading.Thread):
         bearing = math.degrees(math.atan2(val1, val2))
         return bearing
 
+    # Function is called to calculate the final destination when provided an initial lat and lon in degrees
+    # distance to be traveled in meters, and a bearing value
+    # Returns the final destination GPS coordinate
+    def findDestination(self, initGPSLat, initGPSLong, bearing, distance):
+        R = 6371000  # average radius of earth in meters
+        initRadLat = math.radians(initGPSLat)
+        initRadLong = math.radians(initGPSLong)
+        bearRad = math.radians(bearing)
+        angularDist = distance/R
+
+        destLatitude = math.asin(math.sin(initRadLat)*math.cos(angularDist)+math.cos(initRadLat)*math.sin(angularDist)*math.cos(bearRad))
+        destLongitude = initRadLong + math.atan2(math.sin(bearRad)*math.sin(angularDist)*math.cos(initRadLat), math.cos(angularDist)-math.sin(initRadLat)*math.sin*(destLatitude))
+
+        return math.degrees(destLatitude), math.degrees(destLongitude)
+
 
 thread = __GPSWrapper()
 thread.start()
