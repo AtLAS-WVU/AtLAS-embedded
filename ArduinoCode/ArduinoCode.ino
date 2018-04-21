@@ -221,7 +221,7 @@ void loop() {
     sensorBuffer[LEDDAR_SENSOR_NUM] = millis() % 1000;
 
     updateIMU();
-    updateSonar();
+    //updateSonar();
 
 }
 
@@ -249,25 +249,28 @@ void updateIMU(){
         mz = x * mag_softiron_matrix[2][0] + y * mag_softiron_matrix[2][1] + z * mag_softiron_matrix[2][2];
         
         filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
-    
 
+        // The tilt-compensation equation expects the pitch and roll in a certain orientation.
+        // All this nonsense just gets them into that orientation.
         yaw = filter.getYaw();
-        pitch = filter.getPitch();
+        pitch = -filter.getPitch();
         roll = filter.getRoll();
-        
+        roll = roll > 0 ? 180.0f - roll : -180.0f - roll;
+        roll = -roll;
 
-        float sinphi = sin(roll);
-        float sintheta = sin(pitch);
-        float cosphi = cos(roll);
-        float costheta = cos(pitch);
+        float sinphi = sin(roll / radToDeg);
+        float sintheta = sin(pitch / radToDeg);
+        float cosphi = cos(roll / radToDeg);
+        float costheta = cos(pitch / radToDeg);
 
         // Magnetometer tilt compensation
         // (Equations from https://cache.freescale.com/files/sensors/doc/app_note/AN4248.pdf)
         float tmx, tmy, tmz;
-        tmx = (mx * costheta) + (my * sintheta * sinphi) + (mx * sintheta * cosphi);
+        tmx = (mx * costheta) + (my * sintheta * sinphi) + (mz * sintheta * cosphi);
         tmy = (my * cosphi) - (mz * sinphi);
         //tmz = (-mx * sintheta) + (my * costheta * sinphi) + (mz * costheta * cosphi);
-        heading = atan2(my, mx) * radToDeg;
+        
+        heading = atan2(tmy, tmx) * radToDeg;
         heading = heading < 0 ? heading + 360.0f : heading;
 
         yaw = yaw < 0 ? yaw + 360.0f : yaw;

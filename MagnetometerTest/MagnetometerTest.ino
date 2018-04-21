@@ -232,19 +232,24 @@ void sensorFusion(){
     
     filter.update(gx, gy, gz, ax, ay, az, mx, my, mz);
     //filter.updateIMU(gx, gy, gz, ax, ay, az);
+    float yaw = filter.getYaw();
+    float pitch = -filter.getPitch();
+    float roll = filter.getRoll();
+    roll = roll > 0 ? 180.0f - roll : -180.0f - roll;
+    roll = -roll;
     Serial.print("Yaw: ");
-    Serial.print(filter.getYaw());
+    Serial.print(yaw);
     Serial.print(", Pitch: ");
-    Serial.print(filter.getPitch());
+    Serial.print(pitch);
     Serial.print(", Roll: ");
-    Serial.print(filter.getRoll());
+    Serial.print(roll);
 
-    Serial.print(", M: (");
-    Serial.print(mx);
-    Serial.print(", ");
-    Serial.print(my);
-    Serial.print(", ");
-    Serial.print(mz);
+//    Serial.print(", M: (");
+//    Serial.print(mx);
+//    Serial.print(", ");
+//    Serial.print(my);
+//    Serial.print(", ");
+//    Serial.print(mz);
 //
 //    Serial.print("), A: (");
 //    Serial.print(ax);
@@ -253,13 +258,43 @@ void sensorFusion(){
 //    Serial.print(", ");
 //    Serial.print(az);
 
+    
+    
+    float sinphi = sin(roll / radToDeg);
+    float sintheta = sin(pitch / radToDeg);
+    float cosphi = cos(roll / radToDeg);
+    float costheta = cos(pitch / radToDeg);
+
+    Serial.print(", Trig: (");
+    Serial.print(sinphi);
+    Serial.print(", ");
+    Serial.print(cosphi);
+    Serial.print(", ");
+    Serial.print(sintheta);
+    Serial.print(", ");
+    Serial.print(costheta);
+    
+    // Magnetometer tilt compensation
+    // (Equations from https://cache.freescale.com/files/sensors/doc/app_note/AN4248.pdf)
+    float tmx, tmy, tmz;
+    tmx = (mx * costheta) + (my * sintheta * sinphi) + (mz * sintheta * cosphi);
+    tmy = (my * cosphi) - (mz * sinphi);
+    //tmz = (-mx * sintheta) + (my * costheta * sinphi) + (mz * costheta * cosphi);
+
     float heading = atan2(my, mx) * radToDeg;
     if(heading < 0){
         heading += 360.0f;
     }
+    float betterheading = atan2(tmy, tmx) * radToDeg;
+    if(betterheading < 0){
+        betterheading += 360.0f;
+    }
     //heading = updateAverageHeading(heading);
-    Serial.print("), Heading: ");
-    Serial.println(heading);
+    Serial.print("), Raw Heading: ");
+    Serial.print(heading);
+    Serial.print(", Tilt-Corrected Heading: ");
+    Serial.print(betterheading);
+    Serial.println("");
 
     delay(100);
 }
