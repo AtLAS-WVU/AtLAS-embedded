@@ -1,47 +1,77 @@
 import requests
 import time
 import os
-import GPSWrapper
-#Specifies where to send data to
-API_DESTINATION_TO_SERVER = "https://deliverwithatlas.com/UpdateDroneStatus.php"
-API_DESTINATION_FROM_SERVER = "https://deliverwithatlas.com/UpdateWaypoint.php"
+from GPSWrapper import thread as gps
+import json
+import threading
+from config import API_DESTINATION_FROM_SERVER, API_DESTINATION_TO_SERVER, DRONE_ID, DRONE_PRIVATE_KEY, \
+    SERVER_POLLING_PERIOD
 
-#Creates a gps object that holds all values to be sent to server
-#Communicates via threads to constantly send new coordinates every second
-gps = GPSWrapper.thread
 
-#Set default values for aircraft being used
-droneID = 1234
-dronePrivateKey = 1234567890
-currentBatteryLife = 100
-currentStageOfDelivery = 'idle'	#Needs to be updated
-isBlocked = False #Needs to be updated constantly based on sensor readings
-try:
-	gps.start()
-	while True:
-		latitude = gps.latitude
-		longitude = gps.longitude
-		altitude = gps.altitude
-		speed = gps.speed
-		droneStatus = {"drone_id":droneID, "drone_private_key":dronePrivateKey, "current_battery_life":currentBatteryLife,
-        	      	 "current_stage_of_delivery":currentStageOfDelivery, "latitude":latitude, "longitude":longitude,
-              		 "altitude":altitude, "speed":speed}
+class __ServerThread(threading.Thread):
 
-		response = requests.post(url = API_DESTINATION_TO_SERVER, data = droneStatus)
+    # Set default values for aircraft being used
+    currentBatteryLife = 100
+    currentStageOfDelivery = 'idle'  # Needs to be updated
+    isBlocked = False  # Needs to be updated constantly based on sensor readings
 
-		#For testing
-		#print("The result from sending data to server was: ", response.text)
+    waypoint_latitude = 0
+    waypoint_longitude = 0
+    waypoint_altitude = 0
+    has_waypoint = False
 
-		obstacleStatus = {"drone_id":droneID, "drone_private_key":dronePrivateKey, "is_blocked":isBlocked}
-		
-		response = requests.post(url = API_DESTINATION_FROM_SERVER, data = obstacleStatus)
+    def __init__(self):
+        super().__init__()
 
-		#For testing
-		#print("Result from getting new waypoint from server: ", response.text)
-		time.sleep(1)
+    def run(self):
 
-except (KeyboardInterrupt, SystemExit): 
-	print("\nKilling Thread...")
-	gps.running = False
-	gps.join()
-print("Done.")
+        while True:
+            latitude = gps.latitude
+            longitude = gps.longitude
+            altitude = gps.altitude
+            speed = gps.speed
+            droneStatus = {"drone_id": DRONE_ID, "drone_private_key": DRONE_PRIVATE_KEY,
+                           "current_battery_life": self.currentBatteryLife,
+                           "current_stage_of_delivery": self.currentStageOfDelivery, "latitude": latitude,
+                           "longitude": longitude,
+                           "altitude": altitude, "speed": speed}
+
+            response = requests.post(url=API_DESTINATION_TO_SERVER, data=droneStatus)
+
+            # For testing
+            # print("The result from sending data to server was: ", response.text)
+
+            obstacleStatus = {"drone_id": DRONE_ID, "drone_private_key": DRONE_PRIVATE_KEY,
+                              "is_blocked": self.isBlocked}
+
+            response = requests.post(url=API_DESTINATION_FROM_SERVER, data=obstacleStatus)
+            response = response.json()
+            if response["success"]:
+                self.has_waypoint = True
+                self.waypoint_longitude = response["waypoint"]["longitude"]
+                self.waypoint_latitude = response["waypoint"]["latitude"]
+                self.waypoint_altitude = response["waypoint"]["altitude"]
+            else:
+                self.has_waypoint = False
+
+            # For testing
+            # print("Result from getting new waypoint from server: ", response.text)
+            time.sleep(SERVER_POLLING_PERIOD)
+
+
+__thread = __ServerThread()
+__thread.start()
+
+
+def has_waypoint():
+    return __thread.has_waypoint
+
+
+def get_waypoint():
+    """
+    :return: longitude, latitude, altitude, or None if there is no waypoint
+    """
+    if __thread.has_waypoint:
+        return __thread.waypoint_longitude, __thread.waypoint_latitude, __thread.waypoint_altitude
+    else:
+        return None

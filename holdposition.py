@@ -1,15 +1,14 @@
 import threading
 import config
-if config.SIMULATION:
-    from simulator import uavcontrol
-else:
-    import uavcontrol
+from config import UAV_CONTROL_UPDATE_PERIOD
 import time
 import math
 from pid import Pid
 from GPSWrapper import thread as gps
-
-from config import UAV_CONTROL_UPDATE_PERIOD
+if config.SIMULATION:
+    from simulator import uavcontrol
+else:
+    import uavcontrol
 
 
 def constrain(val, min_=-1.0, max_=1.0):
@@ -31,6 +30,7 @@ class __AutonomyThread(threading.Thread):
         self.aux_switch_was_flipped = False
         self.last_debug_print = time.time()
         self.last_gps_update = 0
+        self.enabled = False
 
     def calc_error(self):
         """
@@ -63,6 +63,9 @@ class __AutonomyThread(threading.Thread):
         self.reset_target(gps.latitude, gps.longitude, uavcontrol.get_compass_sensor(average=True, continuous=True))
 
         while self.running:
+            if not self.enabled:
+                time.sleep(UAV_CONTROL_UPDATE_PERIOD)
+                continue
             if uavcontrol.get_aux_input() and not self.aux_switch_was_flipped:
                 self.aux_switch_was_flipped = True
                 print("AUX SWITCH FLIPPED")
@@ -86,6 +89,8 @@ class __AutonomyThread(threading.Thread):
                 self.last_gps_update = time.time()
                 gps.updated = False
                 left_error, forward_error = self.calc_error()
+                if math.sqrt(left_error ** 2 + forward_error ** 2) > config.ORIENTATION_ERROR_MARGIN:
+                    self.target_yaw = gps.findCurrentBearing(self.target_lat, self.target_lon)
                 left_correction = self.pid_left.update(left_error)
                 forward_correction = self.pid_forward.update(forward_error)
 
@@ -111,6 +116,21 @@ class __AutonomyThread(threading.Thread):
 
 __thread = __AutonomyThread()
 __thread.start()
+
+
+def set_enabled(enabled):
+    __thread.enabled = enabled
+
+
+def set_target(lat, lon):
+    __thread.target_lat = lat
+    __thread.target_lon = lon
+
+
+def get_target():
+    return __thread.target_lat, __thread.target_lon
+
+
 if __name__ == "__main__":
     while True:
         time.sleep(1)

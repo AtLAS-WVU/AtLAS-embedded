@@ -13,8 +13,8 @@ SIMULATION = True
 # Drone mass in Kg
 DRONE_MASS = 2.35
 
-# Max thrust. Assume it's twice as much as the weight of the drone.
-MAX_THRUST = 2 * DRONE_MASS * 9.81
+# Max thrust. This is a blatant guess.
+MAX_THRUST = 4 * DRONE_MASS * 9.81
 
 # Limits of how far the drone can rotate, in degrees
 MAX_PITCH = 30
@@ -34,6 +34,19 @@ SIMULATOR_PERIOD = 0.1
 # Maximum velocity, in meters/second
 MAX_VELOCITY = 10
 
+############################
+# Web Communication Config #
+############################
+
+# Specifies where to send data to
+API_DESTINATION_TO_SERVER = "https://deliverwithatlas.com/UpdateDroneStatus.php"
+API_DESTINATION_FROM_SERVER = "https://deliverwithatlas.com/UpdateWaypoint.php"
+
+DRONE_ID = 1234
+DRONE_PRIVATE_KEY = 1234567890
+
+SERVER_POLLING_PERIOD = 1
+
 #####################
 # Autonomy Settings #
 #####################
@@ -43,6 +56,10 @@ UAV_CONTROL_UPDATE_PERIOD = 0.01
 
 # Number of elements to take a rolling average of for the compass sensor
 COMPASS_SENSOR_ROLLING_AVERAGE = 1.0 / UAV_CONTROL_UPDATE_PERIOD
+
+# If the drone is further than this many meters from its target, it will constantly update its
+# yaw to face toward the target. If this number is too small, it can lead to some crazy oscillations.
+ORIENTATION_ERROR_MARGIN = 20
 
 # Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty*'
 SERIAL_PORT = "/dev/ttyS0"
