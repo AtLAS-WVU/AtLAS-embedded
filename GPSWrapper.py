@@ -2,8 +2,12 @@ import os
 import time
 import math
 import threading
-from gpspy3.gps import *
+import config
 import logging
+if config.SIMULATION:
+    from simulator import gps
+else:
+    from gpspy3 import gps
 
 logging.getLogger('gpspy3').setLevel(logging.ERROR)
 
@@ -21,7 +25,7 @@ class __GPSWrapper(threading.Thread):
 
     def __init__(self):
         super().__init__()
-        self.gpsd = GPS(mode=WATCH_ENABLE)
+        self.gpsd = gps.GPS(mode=gps.WATCH_ENABLE)
         self.current_value = None
         self.running = True
         self.updated = False
@@ -102,21 +106,6 @@ class __GPSWrapper(threading.Thread):
                                                             math.cos(destRadLong - curRadLong)
         bearing = math.degrees(math.atan2(val1, val2))
         return bearing
-
-    # Function is called to calculate the final destination when provided an initial lat and lon in degrees
-    # distance to be traveled in meters, and a bearing value
-    # Returns the final destination GPS coordinate
-    def findDestination(self, initGPSLat, initGPSLong, bearing, distance):
-        R = 6371000  # average radius of earth in meters
-        initRadLat = math.radians(initGPSLat)
-        initRadLong = math.radians(initGPSLong)
-        bearRad = math.radians(bearing)
-        angularDist = distance/R
-
-        destLatitude = math.asin(math.sin(initRadLat)*math.cos(angularDist)+math.cos(initRadLat)*math.sin(angularDist)*math.cos(bearRad))
-        destLongitude = initRadLong + math.atan2(math.sin(bearRad)*math.sin(angularDist)*math.cos(initRadLat), math.cos(angularDist)-math.sin(initRadLat)*math.sin*(destLatitude))
-
-        return math.degrees(destLatitude), math.degrees(destLongitude)
 
 
 thread = __GPSWrapper()

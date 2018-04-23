@@ -1,5 +1,9 @@
 import threading
-import uavcontrol
+import config
+if config.SIMULATION:
+    from simulator import uavcontrol
+else:
+    import uavcontrol
 import time
 import math
 from pid import Pid
@@ -20,9 +24,9 @@ class __AutonomyThread(threading.Thread):
         self.target_lat = 39
         self.target_lon = 70
         self.target_yaw = 0
-        self.pid_left = Pid(0.04, 0, 0.05, max_integral=1)
-        self.pid_forward = Pid(0.04, 0, 0.05, max_integral=1)
-        self.pid_yaw = Pid(0.01, 0.005, 0.001, max_integral=10)
+        self.pid_left = Pid(0.1, 0, 0.3, max_integral=1)
+        self.pid_forward = Pid(0.1, 0, 0.3, max_integral=1)
+        self.pid_yaw = Pid(0.01, 0.005, 0, max_integral=10)
         self.prev_yaw_error = 0
         self.aux_switch_was_flipped = False
         self.last_debug_print = time.time()
@@ -85,29 +89,30 @@ class __AutonomyThread(threading.Thread):
                 left_correction = self.pid_left.update(left_error)
                 forward_correction = self.pid_forward.update(forward_error)
 
-                left_correction = constrain(left_correction, min_=-0.2, max_=0.2)
-                forward_correction = constrain(forward_correction, min_=-0.2, max_=0.2)
+                left_correction = constrain(left_correction, min_=-0.8, max_=0.8)
+                forward_correction = constrain(forward_correction, min_=-0.8, max_=0.8)
 
                 # Positive pitch is forward, so this is all good
-                # uavcontrol.set_pitch(forward_correction)
+                uavcontrol.set_pitch(forward_correction)
                 # Positive roll is right, so negate it to make it left
-                # uavcontrol.set_roll(-left_correction)
+                uavcontrol.set_roll(-left_correction)
 
-                #if time.time() - self.last_debug_print > 0.5:
-                self.last_debug_print = time.time()
-                print("{:.1f} Err: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f}), PID: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f})".format(
-                    time.time(), left_error, forward_error, yaw_error, left_correction, forward_correction, yaw_correction)
-                )
+                print("{:.1f} Err: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f}), "
+                      "PID: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f})".format(
+                          time.time(), left_error, forward_error, yaw_error, left_correction,
+                          forward_correction, yaw_correction)
+                      )
 
-            uavcontrol.set_pitch(uavcontrol.get_pitch_input())
-            uavcontrol.set_roll(uavcontrol.get_roll_input())
+            # uavcontrol.set_pitch(uavcontrol.get_pitch_input())
+            # uavcontrol.set_roll(uavcontrol.get_roll_input())
 
             time.sleep(UAV_CONTROL_UPDATE_PERIOD)
 
 
 __thread = __AutonomyThread()
 __thread.start()
-while True:
-    time.sleep(1)
+if __name__ == "__main__":
+    while True:
+        time.sleep(1)
 
 # thread = __thread

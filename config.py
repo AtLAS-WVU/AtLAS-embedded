@@ -3,18 +3,48 @@
 # Resolution to capture from the camera, as a tuple of (width, height)
 CAMERA_RESOLUTION = (1920//4, 1080//4)  # TODO: Adjust to a good resolution
 
-# True if this code is being run on the Raspberry Pi
-# (Currently used only for image processing debugging)
-# TODO: Remove this. It should always be True in production
-RASPBERRY_PI = False
+####################
+# Simulator Values #
+####################
+
+# Switch to False to run the software on the actual drone
+SIMULATION = True
+
+# Drone mass in Kg
+DRONE_MASS = 2.35
+
+# Max thrust. Assume it's twice as much as the weight of the drone.
+MAX_THRUST = 2 * DRONE_MASS * 9.81
+
+# Limits of how far the drone can rotate, in degrees
+MAX_PITCH = 30
+MIN_PITCH = -30
+MAX_ROLL = 30
+MIN_ROLL = -30
+
+# How fast the drone can yaw, in degrees / sec
+MAX_YAW_RATE = 90
+
+# Starting GPS coordinates [lat, lon]
+START_COORDS = (39.645995, -79.971030)
+
+# Length of simulator tick, in seconds
+SIMULATOR_PERIOD = 0.1
+
+# Maximum velocity, in meters/second
+MAX_VELOCITY = 10
+
+#####################
+# Autonomy Settings #
+#####################
 
 # How often should control signals be sent to the flight controller, in seconds
 UAV_CONTROL_UPDATE_PERIOD = 0.01
 
 # Number of elements to take a rolling average of for the compass sensor
-COMPASS_SENSOR_ROLLING_AVERAGE = 0.5 / UAV_CONTROL_UPDATE_PERIOD
+COMPASS_SENSOR_ROLLING_AVERAGE = 1.0 / UAV_CONTROL_UPDATE_PERIOD
 
-# Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty.*'
+# Serial port for the arduino. Find out on Linux or Mac by running the command 'ls /dev/tty*'
 SERIAL_PORT = "/dev/ttyS0"
 
 ########################################################

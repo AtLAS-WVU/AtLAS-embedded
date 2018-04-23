@@ -118,11 +118,11 @@ unsigned long lastSerialReceived = 0;
 volatile bool serialDisconnected = true;
 volatile bool manualSwitch = false;
 
-float mag_offset[3] = {31.98f, -16.74f, -0.13f};
+float mag_offset[3] = {31.36f, -15.29f, 2.28f};
 float mag_softiron_matrix[3][3] = {
-    {1.012f, -0.007f, -0.008f},
-    {-0.007f, 0.969f, 0.009f},
-    {-0.008f, -0.009f, 1.020f}
+    {1.020f, 0.001f, -0.006f},
+    {0.001f, 0.959f, 0.013f},
+    {-0.006f, 0.013f, 1.023f}
 };
 
 // Magnetic Declination is the "error" of the magnetic field at a given location.

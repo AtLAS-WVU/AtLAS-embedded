@@ -117,7 +117,7 @@ void loop() {
     // Note: When you first start it, it slowly flips over to roll = -180 degrees.
     // This is because the filter for some reason expects the Z axis of the sensor
     // to be pointed downward, but in its current orientation, it points upward.
-    sensorFusion();
+    // sensorFusion();
 
     // Plots all three axes of the magnetometer. To do this, open the serial plotter
     // instead of the serial monitor. (Tools > Serial Plotter)
@@ -125,9 +125,9 @@ void loop() {
 
     // If you want to use the MotionCal program on your laptop, you'll have to use
     // this function, because MotionCal expects the data in a specific format.
-    //calibrate();
+    calibrate();
 
-    //delay(100);
+    delay(100);
 }
 
 void plot(){
