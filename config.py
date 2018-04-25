@@ -13,6 +13,9 @@ SIMULATION = True
 # Drone mass in Kg
 DRONE_MASS = 2.35
 
+# Drag, in no particularly scientific unit
+DRONE_DRAG = 0.01
+
 # Max thrust. This is a blatant guess.
 MAX_THRUST = 4 * DRONE_MASS * 9.81
 
@@ -26,7 +29,7 @@ MIN_ROLL = -30
 MAX_YAW_RATE = 90
 
 # Starting GPS coordinates [lat, lon]
-START_COORDS = (39.645995, -79.971030)
+START_COORDS = (39.637836, -79.955235)
 
 # Length of simulator tick, in seconds
 SIMULATOR_PERIOD = 0.1

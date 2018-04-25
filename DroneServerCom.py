@@ -29,14 +29,18 @@ class __ServerThread(threading.Thread):
             latitude = gps.latitude
             longitude = gps.longitude
             altitude = gps.altitude
-            speed = gps.speed
+            if altitude is not None:
+                altitude += 1
+            speed = 1
             droneStatus = {"drone_id": DRONE_ID, "drone_private_key": DRONE_PRIVATE_KEY,
                            "current_battery_life": self.currentBatteryLife,
                            "current_stage_of_delivery": self.currentStageOfDelivery, "latitude": latitude,
                            "longitude": longitude,
                            "altitude": altitude, "speed": speed}
+            # print(droneStatus)
 
             response = requests.post(url=API_DESTINATION_TO_SERVER, data=droneStatus)
+            print(json.dumps(response.json(), indent=2))
 
             # For testing
             # print("The result from sending data to server was: ", response.text)
@@ -46,11 +50,12 @@ class __ServerThread(threading.Thread):
 
             response = requests.post(url=API_DESTINATION_FROM_SERVER, data=obstacleStatus)
             response = response.json()
+            print(json.dumps(response, indent=2))
             if response["success"]:
                 self.has_waypoint = True
-                self.waypoint_longitude = response["waypoint"]["longitude"]
-                self.waypoint_latitude = response["waypoint"]["latitude"]
-                self.waypoint_altitude = response["waypoint"]["altitude"]
+                self.waypoint_longitude = float(response["waypoint"]["longitude"])
+                self.waypoint_latitude = float(response["waypoint"]["latitude"])
+                self.waypoint_altitude = float(response["waypoint"]["altitude"])
             else:
                 self.has_waypoint = False
 
@@ -69,9 +74,18 @@ def has_waypoint():
 
 def get_waypoint():
     """
-    :return: longitude, latitude, altitude, or None if there is no waypoint
+    :return: latitude, longitude, altitude, or None if there is no waypoint
     """
     if __thread.has_waypoint:
-        return __thread.waypoint_longitude, __thread.waypoint_latitude, __thread.waypoint_altitude
+        return __thread.waypoint_latitude, __thread.waypoint_longitude, __thread.waypoint_altitude
     else:
         return None
+
+
+def set_status(status):
+    """
+
+    :param status: One of 'idle', 'transit', 'delivered'
+    :return:
+    """
+    __thread.currentStageOfDelivery = status

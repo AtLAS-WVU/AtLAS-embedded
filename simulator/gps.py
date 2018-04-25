@@ -26,6 +26,7 @@ class __GPS:
         time.sleep(1)
         self.fix.latitude = simulation.thread.current_coords[0]
         self.fix.longitude = simulation.thread.current_coords[1]
+        self.fix.altitude = simulation.thread.current_altitude
         self.utc = time.time()
 
 

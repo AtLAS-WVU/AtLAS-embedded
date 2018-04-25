@@ -43,6 +43,8 @@ class __Simulator(threading.Thread):
     current_velocity_north = 0.0
     # Velocity of the drone, in meters/second, to the right
     current_velocity_east = 0.0
+    # Velocity of the drone upwards, in meters/second
+    current_velocity_up = 0.0
     # Current orientation of the drone, in degrees.
     current_compass_bearing = 0.0
     # Reading of the leddar sensor, in meters
@@ -73,6 +75,22 @@ class __Simulator(threading.Thread):
             accel_forward, accel_right = rotate(accel_forward, accel_right, self.current_compass_bearing)
             self.current_velocity_north += accel_forward
             self.current_velocity_east += accel_right
+
+            drag_north = -(self.current_velocity_north ** 3) * config.DRONE_DRAG
+            drag_east = -(self.current_velocity_east ** 3) * config.DRONE_DRAG
+            self.current_velocity_north += (drag_north / config.DRONE_MASS) * config.SIMULATOR_PERIOD
+            self.current_velocity_east += (drag_east / config.DRONE_MASS) * config.SIMULATOR_PERIOD
+
+            vertical_force = self.throttle * config.MAX_THRUST * \
+                math.cos(math.radians(roll_degrees)) * math.cos(math.radians(pitch_degrees))
+            vertical_accel = vertical_force / config.DRONE_MASS - 9.81
+            self.current_velocity_up += vertical_accel * config.SIMULATOR_PERIOD
+            self.current_altitude += self.current_velocity_up * config.SIMULATOR_PERIOD
+            if self.current_altitude < 0:
+                self.current_altitude = 0
+                self.current_velocity_up = 0
+                self.current_velocity_east = 0
+                self.current_velocity_north = 0
 
             total_velocity = math.sqrt(self.current_velocity_north ** 2 + self.current_velocity_east ** 2)
             if total_velocity > config.MAX_VELOCITY:

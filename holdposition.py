@@ -23,9 +23,11 @@ class __AutonomyThread(threading.Thread):
         self.target_lat = 39
         self.target_lon = 70
         self.target_yaw = 0
-        self.pid_left = Pid(0.1, 0, 0.3, max_integral=1)
-        self.pid_forward = Pid(0.1, 0, 0.3, max_integral=1)
+        self.target_alt = 0
+        self.pid_left = Pid(0.1, 0, 1.0, max_integral=1)
+        self.pid_forward = Pid(0.1, 0, 1.0, max_integral=1)
         self.pid_yaw = Pid(0.01, 0.005, 0, max_integral=10)
+        self.pid_up = Pid(0.001, 0.0005, 0.01, max_integral=1)
         self.prev_yaw_error = 0
         self.aux_switch_was_flipped = False
         self.last_debug_print = time.time()
@@ -50,17 +52,20 @@ class __AutonomyThread(threading.Thread):
 
         return -left_error, -forward_error
 
-    def reset_target(self, lat, lon, yaw):
+    def reset_target(self, lat, lon, yaw, alt):
         self.target_lat = lat
         self.target_lon = lon
         self.target_yaw = yaw
+        self.target_alt = alt
         self.pid_forward.reset()
         self.pid_left.reset()
         self.pid_yaw.reset()
+        self.pid_up.reset()
 
     def run(self):
-        time.sleep(3)
-        self.reset_target(gps.latitude, gps.longitude, uavcontrol.get_compass_sensor(average=True, continuous=True))
+        time.sleep(1)
+        self.reset_target(gps.latitude, gps.longitude, uavcontrol.get_compass_sensor(average=True, continuous=True),
+                          gps.altitude)
 
         while self.running:
             if not self.enabled:
@@ -74,8 +79,8 @@ class __AutonomyThread(threading.Thread):
             elif not uavcontrol.get_aux_input():
                 self.aux_switch_was_flipped = False
             # Set throttle manually from remote control
-            throttle = uavcontrol.get_throttle_input()
-            uavcontrol.set_throttle(throttle)
+            # throttle = uavcontrol.get_throttle_input()
+            # uavcontrol.set_throttle(throttle)
             # print("set throttle to {}".format(throttle))
 
             yaw_error = uavcontrol.get_compass_sensor(average=True, continuous=True) - self.target_yaw
@@ -89,23 +94,31 @@ class __AutonomyThread(threading.Thread):
                 self.last_gps_update = time.time()
                 gps.updated = False
                 left_error, forward_error = self.calc_error()
+                up_error = gps.altitude - self.target_alt
                 if math.sqrt(left_error ** 2 + forward_error ** 2) > config.ORIENTATION_ERROR_MARGIN:
                     self.target_yaw = gps.findCurrentBearing(self.target_lat, self.target_lon)
                 left_correction = self.pid_left.update(left_error)
                 forward_correction = self.pid_forward.update(forward_error)
+                up_correction = self.pid_up.update(up_error)
 
                 left_correction = constrain(left_correction, min_=-0.8, max_=0.8)
                 forward_correction = constrain(forward_correction, min_=-0.8, max_=0.8)
+                up_correction += (config.DRONE_MASS * 9.81) / \
+                                 (config.MAX_THRUST * math.cos(math.radians(left_correction * config.MAX_ROLL)) *
+                                  math.cos(math.radians(forward_correction * config.MAX_PITCH)))
+                up_correction = constrain(up_correction, min_=0, max_=1.0)
 
                 # Positive pitch is forward, so this is all good
                 uavcontrol.set_pitch(forward_correction)
                 # Positive roll is right, so negate it to make it left
                 uavcontrol.set_roll(-left_correction)
 
-                print("{:.1f} Err: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f}), "
-                      "PID: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f})".format(
-                          time.time(), left_error, forward_error, yaw_error, left_correction,
-                          forward_correction, yaw_correction)
+                uavcontrol.set_throttle(up_correction)
+
+                print("{:5.1f} Err: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f}, U: {:7.3f}), "
+                      "PID: (L: {:7.3f}, F: {:7.3f}, Y: {:7.3f}, U: {:7.3f})".format(
+                          time.time() % 100, left_error, forward_error, yaw_error, up_error, left_correction,
+                          forward_correction, yaw_correction, up_correction)
                       )
 
             # uavcontrol.set_pitch(uavcontrol.get_pitch_input())
@@ -122,9 +135,10 @@ def set_enabled(enabled):
     __thread.enabled = enabled
 
 
-def set_target(lat, lon):
+def set_target(lat, lon, alt):
     __thread.target_lat = lat
     __thread.target_lon = lon
+    __thread.target_alt = alt
 
 
 def get_target():

@@ -51,7 +51,7 @@ class __GPSWrapper(threading.Thread):
             except StopIteration:
                 print("Error connecting to GPSD, trying again.")
         if self.gpsd.fix.mode == 2 or self.gpsd.fix.mode == 3:
-            time.sleep(3)
+            time.sleep(1)
             if self.gpsd.fix.mode == 2 or self.gpsd.fix.mode == 3:
                 return 1
             else:
