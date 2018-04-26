@@ -6,7 +6,7 @@ import time
 import config
 import threading
 if config.SIMULATION:
-    import simulator.uavcontrol as uavcontrol
+    import simulator.uavcontrolsim as uavcontrol
 else:
     import uavcontrol
 
@@ -21,7 +21,7 @@ class Mode(enum.Enum):
 def main():
     mode = Mode.LANDED
 
-    ALTITUDE = 100
+    ALTITUDE = 50
     lat, lon, alt = 0, 0, 0
     while True:
 
@@ -70,4 +70,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# from GPSWrapper import thread as gps; import holdposition as h; import simulator.uavcontrol as uav; import simulator.simulation as sim; import threading; import main; thread = threading.Thread(None, main.main)
+# from GPSWrapper import thread as gps; import holdposition as h; import simulator.uavcontrolsim as uav; import simulator.simulation as sim; import threading; import main; thread = threading.Thread(None, main.main)

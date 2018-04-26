@@ -10,6 +10,8 @@ CAMERA_RESOLUTION = (1920//4, 1080//4)  # TODO: Adjust to a good resolution
 # Switch to False to run the software on the actual drone
 SIMULATION = True
 
+ON_DRONE = False
+
 # Drone mass in Kg
 DRONE_MASS = 2.35
 

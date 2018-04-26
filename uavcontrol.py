@@ -8,7 +8,7 @@ from config import SERIAL_BAUD_RATE, SERIAL_PORT, THROTTLE_CHANNEL, PITCH_CHANNE
     COMPASS_SENSOR_NUM, YAW_SENSOR_NUM, PITCH_SENSOR_NUM, ROLL_SENSOR_NUM, COMPASS_SENSOR_ROLLING_AVERAGE
 
 
-if config.SIMULATION:
+if config.SIMULATION and not config.ON_DRONE:
     raise RuntimeError("You imported uavcontrol while in simulation. Don't do that.")
 
 
@@ -264,13 +264,6 @@ def is_manual_mode():
     """
     return convert_bytes_to_int(__thread.sensor_buffer[MANUAL_CONTROL_CH * 2:MANUAL_CONTROL_CH * 2 + 2]) > 1500
 
-
-def _test():
-    while True:
-        print("Yaw: {:.1f}, Pitch: {:.1f}, Roll: {:.1f}, Compass: {:.1f}".format(get_yaw_sensor(), get_pitch_sensor(),
-                                                                                 get_roll_sensor(),
-                                                                                 get_compass_sensor()))
-        time.sleep(0.1)
 
 if __name__ == "__main__":
     while True:

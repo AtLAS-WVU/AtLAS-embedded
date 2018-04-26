@@ -1,28 +1,39 @@
 from simulator import simulation
+import config
+if config.ON_DRONE:
+    import uavcontrol as realuav
 
 
 def set_throttle(throttle):
     if throttle < 0 or throttle > 1:
         raise ValueError("Throttle must be between 0 and 1, inclusive")
     simulation.thread.throttle = throttle
+    if config.ON_DRONE:
+        realuav.set_throttle(throttle)
 
 
 def set_pitch(pitch):
     if pitch < -1 or pitch > 1:
         raise ValueError("Pitch must be between -1 and 1, inclusive")
     simulation.thread.pitch = pitch
+    if config.ON_DRONE:
+        realuav.set_pitch(pitch)
 
 
 def set_yaw_signal(yaw):
     if yaw < -1 or yaw > 1:
         raise ValueError("yaw must be between -1 and 1, inclusive")
     simulation.thread.yaw = yaw
+    if config.ON_DRONE:
+        realuav.set_yaw_signal(yaw)
 
 
 def set_roll(roll):
     if roll < -1 or roll > 1:
         raise ValueError("roll must be between -1 and 1, inclusive")
     simulation.thread.roll = roll
+    if config.ON_DRONE:
+        realuav.set_roll(roll)
 
 
 def get_leddar_sensor():

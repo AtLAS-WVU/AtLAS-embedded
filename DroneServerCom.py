@@ -40,7 +40,7 @@ class __ServerThread(threading.Thread):
             # print(droneStatus)
 
             response = requests.post(url=API_DESTINATION_TO_SERVER, data=droneStatus)
-            print(json.dumps(response.json(), indent=2))
+            # print(json.dumps(response.json(), indent=2))
 
             # For testing
             # print("The result from sending data to server was: ", response.text)
@@ -50,7 +50,7 @@ class __ServerThread(threading.Thread):
 
             response = requests.post(url=API_DESTINATION_FROM_SERVER, data=obstacleStatus)
             response = response.json()
-            print(json.dumps(response, indent=2))
+            # print(json.dumps(response, indent=2))
             if response["success"]:
                 self.has_waypoint = True
                 self.waypoint_longitude = float(response["waypoint"]["longitude"])

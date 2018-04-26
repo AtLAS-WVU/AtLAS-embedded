@@ -6,7 +6,7 @@ import math
 from pid import Pid
 from GPSWrapper import thread as gps
 if config.SIMULATION:
-    from simulator import uavcontrol
+    from simulator import uavcontrolsim as uavcontrol
 else:
     import uavcontrol
 
