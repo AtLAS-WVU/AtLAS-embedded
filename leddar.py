@@ -13,7 +13,7 @@ def Leddar():
     leddar.BAUDRATE=115200
 
     #Gather temperature info
-    #temperature = leddar.read_register(22, 0, 4, True)
+    temperature = leddar.read_register(22, 0, 4, True)
     #print("temp: %f" % (temperature / 256))
 
     #Sleep, otherwise results in crashing
